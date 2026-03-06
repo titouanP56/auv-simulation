@@ -1,0 +1,58 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: false # Ton ROV évolue en 3D
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # IMU : On n'utilise QUE les vitesses angulaires pour éviter le décalage de cap initial
+    imu0: /imu/fixed
+    imu0_config: [false, false, false, # Orientation (Roll, Pitch, Yaw) -> OFF
+                  false, false, false, 
+                  false, false, false,
+                  true,  true,  true,  # Angular Velocity -> ON
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative: true # Très important si tu réactives l'orientation un jour
+    imu0_queue_size: 10
+
+    # DVL : Vitesses linéaires dans le repère du robot (base_link)
+    twist0: /dvl/velocity_ros
+    twist0_config: [false, false, false,
+                    false, false, false,
+                    true,  true,  true,  # Linear Velocity (X, Y, Z) -> ON
+                    false, false, false,
+                    false, false, false]
+    twist_body: true # Confirmé : ton DVL publie en base_link
+    twist0_queue_size: 10
+
+    # Profondeur : Position Z absolue
+    pose0: /depth/pose
+    pose0_config: [false, false, true,   # Position Z -> ON
+                   false, false, false,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    pose0_queue_size: 10
+
+    # Process Noise Covariance : On réduit les valeurs pour "brider" la dérive
+    # Valeurs resserrées sur la diagonale (X, Y, Z, roll, pitch, yaw, vx, vy, vz...)
+    process_noise_covariance: [0.01, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.005, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.005, 0.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001, 0.0, 0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001, 0.0, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001, 0.0, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001, 0.0, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.001]
