@@ -33,7 +33,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={'gz_args': f'-r -v 4 {sdf_file}'}.items(),
+        launch_arguments={'gz_args': f'-r {sdf_file}'}.items(),
     )
 
     # 2. Spawn the robot model in Gazebo
@@ -166,7 +166,15 @@ def generate_launch_description():
         arguments=['0', '0', '0', '0', '0', '0', 'sonoptix_link', 'BlueROV2/base_link/sonoptix_sonar']
     )
 
+    # ── Gazebo Resource Path ─────────────────────────────────────────────
+    from launch.actions import SetEnvironmentVariable
+    gz_resource_path = SetEnvironmentVariable(
+        name='GZ_SIM_RESOURCE_PATH',
+        value=[os.path.join(get_package_share_directory('AUV_description'), '..')]
+    )
+
     return LaunchDescription([
+        gz_resource_path,
         gz_sim,
         create_entity,
         robot_state_publisher,

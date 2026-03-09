@@ -15,9 +15,10 @@ It implements controllers ranging from Station Keeping using PID to Model Predic
 The package is structured to offer several levels of control:
 
 ### 1. Advanced Controllers (Navigation)
-- **`mpc_controller_sensors.py`**: **[Core of the project]** The main MPC controller designed to work realistically with the robot's sensors. It subscribes to the filtered odometry from the EKF (`/odometry/filtered`) and calculates the optimal `cmd_vel` commands for the 8 thrusters.
-- **`station_keeping.py`**: Robust and fast PID controller to maintain the AUV at a stable `(x, y, z, yaw)` position. Useful as a default behavior or "fail-safe".
-- **`mpc_controller_blueROV.py`**: "Theoretical" version of the MPC. Unlike the `sensors` node, this one subscribes directly to the exact odometry (`/odom`) coming from Gazebo.
+- **`mpc_controller_realistic.py`**: Similar to the sensors version but tuned specifically for the realistic BlueROV2 model.
+- **`mpc_controller_sensors.py`**: Main MPC controller designed to work with the robot's sensors. Subscribes to `/odometry/filtered` and calculates optimal thruster commands.
+- **`station_keeping.py`**: Robust and fast PID controller to maintain the AUV at a stable `(x, y, z, yaw)` position.
+- **`mpc_controller_blueROV.py`**: Theoretical version of the MPC, subscribing directly to exact ground truth `/odom`.
 
 ### 2. Utilities & Tests (Open Loop)
 Moved or structured in specific sub-folders (`bluerov/` or `tools/`), we find:
@@ -47,7 +48,12 @@ source install/setup.bash
 ros2 run AUV_controller station_keeping
 ```
 
-3. Launch the dynamic MPC controller (with sensors EKF):
+3. Launch the realistic MPC controller:
+```bash
+ros2 run AUV_controller mpc_controller_realistic
+```
+
+4. Launch the standard sensors MPC:
 ```bash
 ros2 run AUV_controller mpc_controller_sensors
 ```

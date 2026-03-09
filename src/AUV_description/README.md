@@ -3,7 +3,7 @@
 This package contains the robot description (URDF/Xacro), Gazebo simulation worlds, and launch files for the AUV within the `ros2_AUV` workspace.
 
 ## Main Features
-- **Robot Descriptions**: URDF and Xacro files for the BlueROV2, including modular configurations with various sensors (DVL, IMU, Camera, Ping360 Sonar, Sonoptix Echo, depth sensor).
+- **Robot Descriptions**: URDF and Xacro files for the BlueROV2, including modular configurations with various sensors (DVL, IMU, Camera, Ping360 Sonar, Sonoptix Echo, depth sensor) and a a **realistic version**.
 - **Gazebo Simulation**: Simulation environment (`Bassin_ntnu.xml`).
 - **Launch Files**: Comprehensive launch files that spawn the robot in Gazebo, start the `robot_state_publisher`, and set up `ros_gz_bridge` for communication between Gazebo and ROS 2.
 - **Utility Nodes (Python)**: Includes nodes to correct or process simulation data for ROS 2 navigation (`simulated_depth_sensor`, `imu_republisher`).
@@ -18,10 +18,11 @@ This package contains the robot description (URDF/Xacro), Gazebo simulation worl
 
 - `bluerov2_bassin.launch.py`: Launches the BlueROV2 in the NTNU basin environment.
 - `bluerov2_bassin_captors.launch.py`: Launches the BlueROV2 **fully equipped with sensors** in the NTNU basin. Also starts localization nodes and communication bridges.
+- `test_bluerov2_realistic.launch.py`: Launches the **realistic BlueROV2** in the NTNU basin with full sensor suite (DVL, IMU, Sonars).
 
 ## Usage
 
-To launch the fully equipped BlueROV2 in the NTNU basin, execute the following command:
+To launch the BlueROV2 in the NTNU basin:
 
 ```bash
 colcon build

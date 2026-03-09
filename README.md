@@ -44,13 +44,18 @@ source install/setup.bash
 
 Now, let's start the virtual pool and put the robot inside it. In the same terminal, run:
 
-```bash
-ros2 launch AUV_description bluerov2_bassin_captors.launch.py
-```
-and for the AUV without captors, run :
-```bash
-ros2 launch AUV_description bluerov2_bassin.launch.py
-```
+- **Realistic Simulation** :
+  ```bash
+  ros2 launch AUV_description test_bluerov2_realistic.launch.py
+  ```
+- **Equipped with sensors** (classic):
+  ```bash
+  ros2 launch AUV_description bluerov2_bassin_captors.launch.py
+  ```
+- **Basic model** (no sensors):
+  ```bash
+  ros2 launch AUV_description bluerov2_bassin.launch.py
+  ```
 
 Wait a few moments. A new window (Gazebo) will open showing a 3D pool with the BlueROV2 submarine floating inside. The robot's sensors are now active and gathering data.
 
@@ -75,7 +80,11 @@ Here is the list of scripts you can launch to move the robot:
   ```bash
   ros2 run AUV_controller station_keeping
   ```
-- **MPC with Sensors**: Advanced Model Predictive Control using real sensor data (EKF odometry) to navigate.
+- **MPC Realistic**: **[Optimized]** Advanced Model Predictive Control tuned for the realistic BlueROV2 model.
+  ```bash
+  ros2 run AUV_controller mpc_controller_realistic
+  ```
+- **MPC with Sensors**: Standard MPC using real sensor data (EKF odometry) to navigate.
   ```bash
   ros2 run AUV_controller mpc_controller_sensors
   ```

@@ -29,6 +29,25 @@
     </plugin>
     <plugin filename="gz-sim-dvl-system" name="gz::sim::systems::DopplerVelocityLogSystem"/>
 
+    <!-- Visual Water Surface (Simple Plane) -->
+    <model name="water_surface">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>32 6.45</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.0 0.2 0.5 0.5</ambient>
+            <diffuse>0.0 0.2 0.5 0.5</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
     <scene>
       <ambient>0.5 0.5 0.5 1.0</ambient>
       <background>0.7 0.7 0.8 1.0</background>

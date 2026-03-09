@@ -1,0 +1,440 @@
+<?xml version="1.0"?>
+<robot name="BlueROV2_Realistic" xmlns:xacro="http://www.ros.org/wiki/xacro" xmlns:gz="http://gazebosim.org/schema">
+
+    <xacro:property name="PI" value="3.1415926535897931"/>
+    
+    <!-- Base link -->
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find AUV_description)/meshes/bluerov2/bluerov2_heavy.dae"/>
+            </geometry>
+        </visual>
+        
+        <!-- Simplified collision based on the original box 0.46 x 0.38 x 0.0809 -->
+        <collision>
+            <origin xyz="0 0 0.04" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.46 0.38 0.08"/>
+            </geometry>
+        </collision>
+        
+        <inertial>
+            <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+            <mass value="12.5"/>
+            <inertia ixx="0.5" ixy="0" ixz="0" iyy="0.57" iyz="0" izz="0.37"/>
+        </inertial>
+    </link>
+
+    <gazebo reference="base_link">
+        <material>Gazebo/DarkGrey</material>
+    </gazebo>
+
+    <!-- Hydrodynamics Plugin for Gazebo Harmonic -->
+    <gazebo>
+        <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+            <link_name>base_link</link_name>
+            <!-- Use 997 to match Bassin_ntnu.xml -->
+            <water_density>997</water_density>
+            <!-- Set CoB slightly above CoG for restoring forces -->
+            <center_of_buoyancy>0.0 0.0 0.1</center_of_buoyancy>
+            
+            <!-- Coefficients from bluerov2_pretty.urdf.xacro / BlueROV2captors.urdf.xml -->
+            <!-- Positive added mass is subtracted from rigid mass internally. -->
+            <!-- Mass (12.5) > Added Mass Z (12.0) ensures positive effective mass! -->
+            <xDotU>6.36</xDotU>
+            <yDotV>7.12</yDotV>
+            <zDotW>12.0</zDotW>
+            <kDotP>0.15</kDotP>
+            <mDotQ>0.14</mDotQ>
+            <nDotR>0.15</nDotR>
+            
+            <xU>-4.03</xU>
+            <yV>-6.22</yV>
+            <zW>-5.18</zW>
+            <kP>-0.07</kP>
+            <mQ>-0.07</mQ>
+            <nR>-0.07</nR>
+            
+            <xUabsU>-18.18</xUabsU>
+            <yVabsV>-21.66</yVabsV>
+            <zWabsW>-39.99</zWabsW>
+            <kPabsP>-1.55</kPabsP>
+            <mQabsQ>-1.55</mQabsQ>
+            <nRabsR>-1.55</nRabsR>
+        </plugin>
+    </gazebo>
+
+    <xacro:macro name="add_thruster" params="prefix x y z rpy axis_xyz thrust_coeff">
+        <link name="${prefix}_propeller_link">
+            <!-- No visual to prevent Gazebo auto-generating collision meshes that overlap base_link -->
+            <inertial>
+                <!-- Give it reasonable mass and inertia to prevent Dart constraint explosion -->
+                <mass value="0.1"/> 
+                <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+            </inertial>
+        </link>
+
+        <joint name="${prefix}_joint" type="continuous">
+            <parent link="base_link"/>
+            <child link="${prefix}_propeller_link"/>
+            <origin xyz="${x} ${y} ${z}" rpy="${rpy}"/>
+            <axis xyz="${axis_xyz}"/>
+            <dynamics damping="1.0" friction="1.0"/>
+            <limit effort="100" velocity="500"/>
+        </joint>
+
+        <gazebo>
+            <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+                <joint_name>${prefix}_joint</joint_name>
+                <thrust_coefficient>${thrust_coeff}</thrust_coefficient>
+                <!-- Use 997 to match Bassin_ntnu and prevent scaling bugs -->
+                <fluid_density>997</fluid_density>
+                <propeller_diameter>0.08</propeller_diameter>
+                <max_thrust_cmd>50</max_thrust_cmd> 
+            </plugin>
+        </gazebo>
+        <gazebo reference="${prefix}_propeller_link">
+            <material>Gazebo/Black</material>
+            <buoyancy><enable>false</enable></buoyancy>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:add_thruster prefix="thruster_1" x="0.135" y="-0.11" z="0.0" rpy="0 -1.5708 0.7854" axis_xyz="0 0 1" thrust_coeff="-0.02"/>
+    <xacro:add_thruster prefix="thruster_2" x="0.135" y="0.11" z="0.0" rpy="0 1.5708 -0.7854" axis_xyz="0 0 1" thrust_coeff="0.02"/>
+    <xacro:add_thruster prefix="thruster_3" x="-0.135" y="-0.11" z="0.0" rpy="0 1.5708 2.3562" axis_xyz="0 0 1" thrust_coeff="-0.02"/>
+    <xacro:add_thruster prefix="thruster_4" x="-0.135" y="0.11" z="0.0" rpy="0 -1.5708 -2.3562" axis_xyz="0 0 1" thrust_coeff="0.02"/>
+        <!-- Propulseurs verticaux configuration Heavy (8 thrusters) -->
+    <xacro:add_thruster prefix="thruster_5" x="0.12" y="-0.218" z="0.0" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="-0.02"/>
+    <xacro:add_thruster prefix="thruster_6" x="0.12" y="0.218" z="0.0" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="0.02"/>
+    <xacro:add_thruster prefix="thruster_7" x="-0.12" y="-0.218" z="0.0" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="0.02"/>
+    <xacro:add_thruster prefix="thruster_8" x="-0.12" y="0.218" z="0.0" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="-0.02"/>
+  
+    <!-- ===================== SENSORS ===================== -->
+
+    <!-- Camera sensor (front) -->
+    <link name="camera_link">
+        <visual>
+            <geometry><box size="0.02 0.05 0.05"/></geometry>
+            <material name="blue">
+                <color rgba="0 0 1 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="camera_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+        <!-- Front panel — z=0.08 puts camera in upper body, above the frame rails -->
+        <origin xyz="0.17 0 0.08" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="camera_link">
+        <material>Gazebo/Blue</material>
+        <sensor name="camera" type="camera">
+            <camera>
+                <horizontal_fov>1.047</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                </image>
+            </camera>
+            <always_on>1</always_on>
+            <update_rate>30</update_rate>
+            <topic>camera/image_raw</topic>
+        </sensor>
+    </gazebo>
+
+    <!-- Ping360 sonar (top) — mesh model -->
+    <!-- Mesh native dims: X=77mm, Y=83mm, Z=89mm, corner at origin -->
+    <!-- Visual offset centers the mesh on its geometric midpoint            -->
+    <link name="ping360_link">
+        <visual>
+            <!-- Center: -38.5mm X, -41.5mm Y, -44.6mm Z -->
+            <!-- rpy: -90° around X corrects Y-up export → mesh stands upright -->
+            <origin xyz="-0.0385 -0.0415 -0.0446" rpy="-1.5708 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find AUV_description)/meshes/bluerov2/PING360.STL" scale="0.001 0.001 0.001"/>
+            </geometry>
+            <material name="dark_grey">
+                <color rgba="0.2 0.2 0.2 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.1"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="ping360_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="ping360_link"/>
+        <!-- Centered on top of the robot body, base of mesh at z~0.045m above joint -->
+        <origin xyz="0.0 0.0 0.09" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="ping360_link">
+        <sensor name="ping360_sonar" type="gpu_lidar">
+            <update_rate>10</update_rate>
+            <topic>ping360/scan</topic>
+            <gz:frame_id>ping360_link</gz:frame_id>
+            <lidar>
+                <scan>
+                    <horizontal>
+                        <samples>360</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-3.14159</min_angle>
+                        <max_angle>3.14159</max_angle>
+                    </horizontal>
+                    <vertical>
+                        <samples>1</samples>
+                        <resolution>1</resolution>
+                        <min_angle>0</min_angle>
+                        <max_angle>0</max_angle>
+                    </vertical>
+                </scan>
+                <range>
+                    <min>0.75</min>
+                    <max>50.0</max>
+                    <resolution>0.01</resolution>
+                </range>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.02</stddev>
+                </noise>
+            </lidar>
+            <always_on>1</always_on>
+            <visualize>true</visualize>
+        </sensor>
+    </gazebo>
+
+    <!-- IMU sensor -->
+    <link name="imu_link">
+        <visual>
+            <geometry>
+                <box size="0.02 0.02 0.02"/>
+            </geometry>
+            <material name="orange">
+                <color rgba="1 0.5 0 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="imu_link">
+        <material>Gazebo/Orange</material>
+        <sensor name="imu_sensor" type="imu">
+            <always_on>1</always_on>
+            <update_rate>50</update_rate>
+            <topic>imu</topic>
+            <gz:frame_id>imu_link</gz:frame_id>
+            <imu>
+                <angular_velocity>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>2e-4</stddev>
+                            <bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>2e-4</stddev>
+                            <bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>2e-4</stddev>
+                            <bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev>
+                        </noise>
+                    </z>
+                </angular_velocity>
+                <linear_acceleration>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>1.7e-2</stddev>
+                            <bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>1.7e-2</stddev>
+                            <bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean><stddev>1.7e-2</stddev>
+                            <bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev>
+                        </noise>
+                    </z>
+                </linear_acceleration>
+            </imu>
+        </sensor>
+    </gazebo>
+
+    <!-- DVL A50 — mesh model (bottom-facing) -->
+    <!-- Mesh dims: X=66mm, Y=25mm(thickness), Z=66mm — flat square disc -->
+    <link name="dvl_link">
+        <visual>
+            <!-- Center mesh on its bbox midpoint: X/2=33mm, Y/2=12.5mm, Z/2=33mm -->
+            <origin xyz="-0.033 -0.0125 -0.033" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find AUV_description)/meshes/bluerov2/dvl_a50.STL" scale="0.001 0.001 0.001"/>
+            </geometry>
+            <material name="dark_blue">
+                <color rgba="0.1 0.1 0.5 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.3"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="dvl_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="dvl_link"/>
+        <!-- -π/2 around X: maps face (+Y) to point downward (-Z)  -->
+        <!-- z=-0.10: just below the chassis, closer to robot body  -->
+        <origin xyz="0 0 -0.10" rpy="-1.5708 0 0"/>
+    </joint>
+
+    <gazebo reference="base_link">
+        <sensor name="dvl_sensor" type="custom" gz:type="dvl">
+            <always_on>1</always_on>
+            <update_rate>15</update_rate>
+            <topic>dvl/velocity</topic>
+            <gz:frame_id>base_link</gz:frame_id>
+            <gz:dvl>
+                <type>phased_array</type>
+                <arrangement degrees="true">
+                    <beam id="1">
+                        <aperture>2.0</aperture>
+                        <rotation>45</rotation>
+                        <tilt>22.5</tilt>
+                    </beam>
+                    <beam id="2">
+                        <aperture>2.0</aperture>
+                        <rotation>135</rotation>
+                        <tilt>22.5</tilt>
+                    </beam>
+                    <beam id="3">
+                        <aperture>2.0</aperture>
+                        <rotation>225</rotation>
+                        <tilt>22.5</tilt>
+                    </beam>
+                    <beam id="4">
+                        <aperture>2.0</aperture>
+                        <rotation>315</rotation>
+                        <tilt>22.5</tilt>
+                    </beam>
+                </arrangement>
+                <tracking>
+                    <bottom_mode>
+                        <when>best</when>
+                        <noise type="gaussian">
+                            <stddev>0.01</stddev>
+                        </noise>
+                        <visualize>true</visualize>
+                    </bottom_mode>
+                </tracking>
+            </gz:dvl>
+        </sensor>
+    </gazebo>
+
+    <!-- Sonoptix ECHO sonar (forward-facing) — mesh model -->
+    <!-- Mesh native dims: X=100mm, Y=42mm, Z=150mm, corner at origin -->
+    <!-- Rotation -90° around Y maps Z-axis (150mm length) onto +X (forward).    -->
+    <!-- Visual offset centers the mesh at its geometric midpoint.                -->
+    <link name="sonoptix_link">
+        <visual>
+            <!-- Center mesh: -50mm X, -21mm Y, -75mm Z (in mesh frame after rotation) -->
+            <origin xyz="-0.075 -0.021 -0.05" rpy="0 -1.5708 0"/>
+            <geometry>
+                <mesh filename="file://$(find AUV_description)/meshes/bluerov2/ECHO.STL" scale="0.001 0.001 0.001"/>
+            </geometry>
+            <material name="grey">
+                <color rgba="0.5 0.5 0.5 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.2"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="sonoptix_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="sonoptix_link"/>
+        <!-- Mounted on the front of the robot, centered, slight downward tilt 10° -->
+        <origin xyz="0.20 0.0 -0.02" rpy="0 0.1745 0"/>
+    </joint>
+
+    <gazebo reference="sonoptix_link">
+        <material>Gazebo/Grey</material>
+        <sensor name="sonoptix_sonar" type="gpu_lidar">
+            <update_rate>15</update_rate>
+            <topic>sonoptix</topic>
+            <gz:frame_id>sonoptix_link</gz:frame_id>
+            <lidar>
+                <scan>
+                    <horizontal>
+                        <samples>256</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-1.0472</min_angle>
+                        <max_angle>1.0472</max_angle>
+                    </horizontal>
+                    <vertical>
+                        <samples>20</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-0.1745</min_angle>
+                        <max_angle>0.1745</max_angle>
+                    </vertical>
+                </scan>
+                <range>
+                    <min>0.5</min>
+                    <max>100.0</max>
+                    <resolution>0.01</resolution>
+                </range>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.03</stddev>
+                </noise>
+            </lidar>
+            <always_on>1</always_on>
+            <visualize>true</visualize>
+        </sensor>
+    </gazebo>
+
+    <!-- ===================== PLUGINS ===================== -->
+
+    <!-- Optional Odometry and IMU Plugin -->
+    <gazebo>
+        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+            <odom_frame>odom</odom_frame>
+            <robot_base_frame>base_link</robot_base_frame>
+            <odom_publish_frequency>30</odom_publish_frequency>
+            <publish_tf>true</publish_tf>
+            <dimensions>3</dimensions>
+        </plugin>
+        <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    </gazebo>
+
+</robot>

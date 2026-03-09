@@ -7,10 +7,9 @@ import do_mpc
 import casadi as ca
 import math
 import time
+from .bluerov.thruster_config import THRUST_COEFFS, DIRECTIONS, POSITIONS
 
-# ── 1. Constants derived from BlueROV2.urdf.xml ───────────────────────────────
-THRUST_COEFFS = [-0.2, 0.2, 0.2, -0.2, -0.2, 0.2, 0.2, -0.2]
-RHO = 997.0 # Water density (kg/m^3)
+# RHO = 997.0 # Removed: causing incorrect scaling in mapping
 
 # Net buoyancy force representing the difference between weight and Archimedes' thrust
 BUOYANCY_NET = 2.0 
@@ -54,8 +53,8 @@ class MPCControllerBlueROV(Node):
         # Initialize the do_mpc mathematical model
         self.setup_mpc()
 
-        # Main control loop running at 4Hz (0.25s period)
-        self.timer = self.create_timer(0.25, self.control_loop)
+        # Main control loop running at ~6.6Hz (0.15s period)
+        self.timer = self.create_timer(0.15, self.control_loop)
 
         self.get_logger().info(
             "BlueROV2 Theoretical MPC Controller Initialized (8 Thrusters)"
@@ -107,16 +106,32 @@ class MPCControllerBlueROV(Node):
         Zw_lin = 5.18;   Zw_quad = 39.99   
         Nr_lin = 0.07;   Nr_quad = 1.55    
 
-        # --- 4. Allocation Matrix ---
-        # Note: This matrix uses an older mapping approach compared to the sensor version.
-        sin45 = 0.7071
+        # --- 4. Allocation Matrix (TAM) ---
+        # Computed from empirically-calibrated DIRECTIONS and POSITIONS in thruster_config.py
+        _dirs = DIRECTIONS
+        _pos  = POSITIONS
+        _n = 8
+        _TAM = np.zeros((6, _n))
+        for _i in range(_n):
+            dx, dy, dz = _dirs[_i]
+            px, py, _pz = _pos[_i]
+            _TAM[0, _i] = dx                          # Fx
+            _TAM[1, _i] = dy                          # Fy
+            _TAM[2, _i] = dz                          # Fz
+            _TAM[3, _i] = py * dz - _pz * dy         # Mx (roll)
+            _TAM[4, _i] = _pz * dx - px * dz         # My (pitch)
+            _TAM[5, _i] = px * dy - py * dx          # Mz (yaw)
+        TAM = _TAM
 
-        F_surge = sin45 * ( t1 + t2 - t3 - t4)
-        F_sway  = sin45 * ( t1 - t2 + t3 - t4)
-        F_heave = -t5 + t6 + t7 - t8
-        
-        lever = 0.1697
-        M_yaw = lever * (t1 - t2 - t3 + t4)
+        u_vec = ca.vertcat(t1, t2, t3, t4, t5, t6, t7, t8)
+        tau = ca.mtimes(TAM, u_vec)
+
+        F_surge = tau[0]
+        F_sway  = tau[1]
+        F_heave = tau[2]
+        M_roll  = tau[3]
+        M_pitch = tau[4]
+        M_yaw   = tau[5]
 
         # --- 5. Equations of Motion (Kinematics & Dynamics) ---
         # Kinematics: converting body velocities to earth velocities
@@ -140,8 +155,8 @@ class MPCControllerBlueROV(Node):
         self.mpc = do_mpc.controller.MPC(self.model)
 
         setup_mpc = {
-            'n_horizon': 12, # Prediction horizon
-            't_step': 0.1,   # Time step for prediction
+            'n_horizon': 10, # Prediction horizon (balanced)
+            't_step': 0.15,   # Time step for prediction
             'n_robust': 0,
             'store_full_solution': False,
         }
@@ -149,46 +164,44 @@ class MPCControllerBlueROV(Node):
         
         # Solver options (IPOPT)
         self.mpc.set_param(nlpsol_opts={
-            'ipopt.max_iter': 40,
+            'ipopt.max_iter': 25,
             'ipopt.warm_start_init_point': 'yes',
             'ipopt.print_level': 0,
             'print_time': 0,
-            'ipopt.tol': 1e-3,
-            'ipopt.acceptable_tol': 1e-2,
-            'ipopt.acceptable_obj_change_tol': 1e-2,
+            'ipopt.tol': 5e-2,
+            'ipopt.acceptable_tol': 1e-1,
+            'ipopt.acceptable_obj_change_tol': 1e-1,
         })
 
-        # --- 7. Cost function (Objective) ---
+        # cost function (Objective)
         x_ref, y_ref, z_ref, psi_ref = self.current_target
-        yaw_err = 10.0 * (1 - ca.cos(psi - psi_ref)) # Penalty for yaw deviation
+        yaw_err = 20.0 * (1 - ca.cos(psi - psi_ref)) 
         
-        # mterm: terminal cost
         mterm = (
-            50.0 * (x - x_ref)**2
-            + 50.0 * (y - y_ref)**2
-            + 100.0 * (z - z_ref)**2
+            25.0 * (x - x_ref)**2
+            + 25.0 * (y - y_ref)**2
+            + 50.0 * (z - z_ref)**2
             + yaw_err
         )
         
-        # lterm: stage cost (cost at each step along the horizon)
-        lterm = mterm + 10.0 * r**2
+        # lterm: stage cost + velocity damping
+        lterm = mterm + 15.0 * r**2 + 5.0 * u**2 + 5.0 * v**2
 
-        # Penalty on using excessive thruster force (energy saving and smoothing)
-        lterm += 0.001 * (t1**2 + t2**2 + t3**2 + t4**2
-                        + t5**2 + t6**2 + t7**2 + t8**2)
+        lterm += 0.01 * (t1**2 + t2**2 + t3**2 + t4**2
+                       + t5**2 + t6**2 + t7**2 + t8**2)
 
         self.mpc.set_objective(mterm=mterm, lterm=lterm)
 
         # Rterm: Penalty on the change of thruster inputs between steps
         self.mpc.set_rterm(
-            t1=0.01, t2=0.01, t3=0.01, t4=0.01,
-            t5=0.01, t6=0.01, t7=0.01, t8=0.01,
+            t1=0.1, t2=0.1, t3=0.1, t4=0.1,
+            t5=0.1, t6=0.1, t7=0.1, t8=0.1,
         )
 
         # Relaxed bounds for theoretical MPC
         for name in ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']:
-            self.mpc.bounds['lower', '_u', name] = -50.0
-            self.mpc.bounds['upper', '_u', name] =  50.0
+            self.mpc.bounds['lower', '_u', name] = -5.0
+            self.mpc.bounds['upper', '_u', name] =  5.0
 
         u_vars = self.model.u
         t1_, t2_, t3_, t4_ = u_vars['t1'], u_vars['t2'], u_vars['t3'], u_vars['t4']
@@ -198,17 +211,18 @@ class MPCControllerBlueROV(Node):
         u_state, r_state = x_vars['u'], x_vars['r']
 
         # --- 8. Non-Linear Constraints (Stability & Realism) ---
-        sin45 = 0.7071
-        F_surge_struct = sin45 * (t1_ + t2_ - t3_ - t4_)
-        F_sway_struct  = sin45 * (t1_ - t2_ + t3_ - t4_)
+        u_vec_state = ca.vertcat(t1_, t2_, t3_, t4_, t5_, t6_, t7_, t8_)
+        tau_struct = ca.mtimes(TAM, u_vec_state)
 
-        pitch_torque_balance = (t5_ - t6_ + t7_ - t8_) + (0.1 / 0.12) * F_surge_struct
-        self.mpc.set_nl_cons('eq_pitch_max', pitch_torque_balance, ub=0.5)
-        self.mpc.set_nl_cons('eq_pitch_min', -pitch_torque_balance, ub=0.5)
-        
-        roll_torque_balance = (t5_ + t6_ + t7_ + t8_) - (0.1 / 0.218) * F_sway_struct
-        self.mpc.set_nl_cons('eq_roll_max', roll_torque_balance, ub=0.5)
-        self.mpc.set_nl_cons('eq_roll_min', -roll_torque_balance, ub=0.5)
+        # Roll balance: Mx ≈ 0
+        roll_torque = tau_struct[3]
+        self.mpc.set_nl_cons('eq_roll_max', roll_torque, ub=0.5)
+        self.mpc.set_nl_cons('eq_roll_min', -roll_torque, ub=0.5)
+
+        # Pitch balance: My ≈ 0
+        pitch_torque = tau_struct[4]
+        self.mpc.set_nl_cons('eq_pitch_max', pitch_torque, ub=0.5)
+        self.mpc.set_nl_cons('eq_pitch_min', -pitch_torque, ub=0.5)
 
         self.mpc.set_nl_cons('u_max',  u_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
         self.mpc.set_nl_cons('u_min', -u_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
@@ -277,12 +291,11 @@ class MPCControllerBlueROV(Node):
                 desired_force = float(cmd[i])
                 c = THRUST_COEFFS[i]
 
-                # Convert desired force to rotational speed (omega) using hydrodynamic formula: F = rho * c * omega^2
-                w_sq = desired_force / (RHO * c)
-                command_val = math.copysign(math.sqrt(abs(w_sq)), w_sq)
+                # Corrected mapping: F = c * omega * |omega|  => omega = sign(F/c) * sqrt(|F/c|)
+                command_val = math.copysign(math.sqrt(abs(desired_force) / abs(c)), desired_force / c)
 
                 msg = Float64()
-                msg.data = command_val
+                msg.data = float(command_val)
                 self.pubs[i].publish(msg)
 
             # Logger logic for telemetry (executed every ~20 ticks)
