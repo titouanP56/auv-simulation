@@ -31,38 +31,15 @@
         <material>Gazebo/DarkGrey</material>
     </gazebo>
 
-    <!-- Hydrodynamics Plugin for Gazebo Harmonic -->
+    <!-- Wave-specific Hydrodynamics Plugin -->
     <gazebo>
-        <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
-            <link_name>base_link</link_name>
-            <!-- Use 997 to match Bassin_ntnu.xml -->
-            <water_density>997</water_density>
-            <!-- Set CoB slightly above CoG for restoring forces -->
-            <center_of_buoyancy>0.0 0.0 0.1</center_of_buoyancy>
-            
-            <!-- Coefficients from bluerov2_pretty.urdf.xacro / BlueROV2captors.urdf.xml -->
-            <!-- Positive added mass is subtracted from rigid mass internally. -->
-            <!-- Mass (12.5) > Added Mass Z (12.0) ensures positive effective mass! -->
-            <xDotU>6.36</xDotU>
-            <yDotV>7.12</yDotV>
-            <zDotW>12.0</zDotW>
-            <kDotP>0.15</kDotP>
-            <mDotQ>0.14</mDotQ>
-            <nDotR>0.15</nDotR>
-            
-            <xU>-4.03</xU>
-            <yV>-6.22</yV>
-            <zW>-5.18</zW>
-            <kP>-0.07</kP>
-            <mQ>-0.07</mQ>
-            <nR>-0.07</nR>
-            
-            <xUabsU>-18.18</xUabsU>
-            <yVabsV>-21.66</yVabsV>
-            <zWabsW>-39.99</zWabsW>
-            <kPabsP>-1.55</kPabsP>
-            <mQabsQ>-1.55</mQabsQ>
-            <nRabsR>-1.55</nRabsR>
+        <plugin filename="gz-waves1-hydrodynamics-system" name="gz::sim::systems::WavesHydrodynamics">
+          <enable>base_link</enable>
+          <hydrodynamics>
+            <damping_on>1</damping_on>
+            <viscous_drag_on>1</viscous_drag_on>
+            <pressure_drag_on>1</pressure_drag_on>
+          </hydrodynamics>
         </plugin>
     </gazebo>
 

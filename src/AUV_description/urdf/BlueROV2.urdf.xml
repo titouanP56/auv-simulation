@@ -25,7 +25,7 @@
         - For fresh water (997 kg/m^3) : use 0.0809
         - For sea water (1025 kg/m^3) : use 0.0787
     -->
-    <xacro:property name="collision_height" value="0.0787" />
+    <xacro:property name="collision_height" value="0.0809" />
 
     <!-- ========================================== -->
     <!-- Inertial Macro                             -->
@@ -110,7 +110,7 @@
                 <!-- Coefficient relating angular velocity squared to force (F = coeff * omega * |omega|) -->
                 <thrust_coefficient>${thrust_coeff}</thrust_coefficient>
                 <!-- Must match the simulation water density -->
-                <fluid_density>1025</fluid_density>
+                <fluid_density>997</fluid_density>
                 <max_thrust_cmd>50</max_thrust_cmd> 
             </plugin>
         </gazebo>
@@ -147,7 +147,7 @@
         <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
             <link_name>base_link</link_name>
             <!-- Must match the simulation water density -->
-            <water_density>1025</water_density>
+            <water_density>997</water_density>
 
             <center_of_buoyancy>0 0 0.1</center_of_buoyancy>
             

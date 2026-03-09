@@ -19,6 +19,7 @@ This package contains the robot description (URDF/Xacro), Gazebo simulation worl
 - `bluerov2_bassin.launch.py`: Launches the BlueROV2 in the NTNU basin environment.
 - `bluerov2_bassin_captors.launch.py`: Launches the BlueROV2 **fully equipped with sensors** in the NTNU basin. Also starts localization nodes and communication bridges.
 - `test_bluerov2_realistic.launch.py`: Launches the **realistic BlueROV2** in the NTNU basin with full sensor suite (DVL, IMU, Sonars).
+- `bluerov2_bassin_waves.launch.py`: Launches the **realistic BlueROV2** in the NTNU basin with waves.
 
 ## Usage
 
