@@ -119,3 +119,26 @@ These scripts apply a constant force to test engines or validate physics:
 - **Gazebo is very slow**: 3D simulations require a decent graphics card. If it's too slow, make sure your computer is plugged in and using its dedicated GPU if it has one.
 
 Enjoy experimenting with your autonomous underwater vehicle!
+
+## Visualization with Foxglove
+
+To visualize the robot's sensors and telemetry (cameras, sonar, 3D pose) in real-time using [Foxglove](https://foxglove.dev/), we use the **Foxglove Bridge**.
+
+1. **Install Foxglove Bridge** (if not already installed):
+   ```bash
+   sudo apt install ros-jazzy-foxglove-bridge
+   ```
+
+2. **Launch the Foxglove Bridge Node**:
+   Open a new terminal, source your workspace, and run:
+   ```bash
+   ros2 run foxglove_bridge foxglove_bridge
+   ```
+   *(By default, this opens a WebSocket connection on port `8765`)*
+
+3. **Connect from Foxglove Studio**:
+   - Open the **Foxglove Studio** app (desktop or web version).
+   - Click "**Open connection**".
+   - Select "**Foxglove WebSocket**".
+   - Enter the URL: `ws://localhost:8765` (or replace `localhost` with your robot's IP if running on a different machine).
+   - You can now visualize topics like `/odom`, `/camera/image_raw`, `/ping360/scan`, and 3D models!
