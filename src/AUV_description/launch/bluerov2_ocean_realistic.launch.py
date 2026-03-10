@@ -80,7 +80,8 @@ def generate_launch_description():
         executable='parameter_bridge',
         arguments=bridge_args,
         remappings=bridge_remappings,
-        output='screen'
+        output='screen',
+        parameters=[{'use_sim_time': True}]
     )
 
     # ── DVL bridge ──────────────────────────────────────────────────────
@@ -89,6 +90,16 @@ def generate_launch_description():
         executable='dvl_bridge_node',
         name='dvl_bridge_node',
         output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
+    # ── Simulated Depth Sensor ──────────────────────────────────────────
+    depth_sensor = Node(
+        package='AUV_description', # Note: logic indicates it's in this pkg
+        executable='simulated_depth_sensor',
+        name='simulated_depth_sensor',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
     )
 
     # ── EKF (robot_localization) ─────────────────────────────────────────
@@ -107,7 +118,8 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='static_tf_world_odom',
-        arguments=['0', '0', '0', '0', '0', '0', 'world', 'odom']
+        arguments=['0', '0', '0', '0', '0', '0', 'world', 'odom'],
+        parameters=[{'use_sim_time': True}]
     )
 
     # ── Gazebo Resource Path ─────────────────────────────────────────────
@@ -124,6 +136,7 @@ def generate_launch_description():
         robot_state_publisher,
         bridge,
         dvl_bridge,
+        depth_sensor,
         ekf_node,
         static_tf_world_odom,
     ])

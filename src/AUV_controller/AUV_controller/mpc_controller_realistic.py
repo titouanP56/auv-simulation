@@ -7,7 +7,21 @@ import do_mpc
 import casadi as ca
 import math
 import time
-from AUV_controller.bluerov.thruster_config import THRUST_COEFFS, DIRECTIONS, POSITIONS
+# --- CONFIGURATION DES PROPULSEURS (Internalisée) ---
+_SIN45 = 0.70710678118
+THRUST_COEFFS = [-0.02, 0.02, -0.02, 0.02, -0.02, 0.02, 0.02, -0.02]
+POSITIONS = [
+    [ 0.135, -0.11,  0.0], [ 0.135,  0.11,  0.0],
+    [-0.135, -0.11,  0.0], [-0.135,  0.11,  0.0],
+    [ 0.12, -0.218,  0.0], [ 0.12,  0.218,  0.0],
+    [-0.12, -0.218,  0.0], [-0.12,  0.218,  0.0]
+]
+DIRECTIONS = [
+    [ _SIN45,  _SIN45, 0.0], [ _SIN45, -_SIN45, 0.0],
+    [ _SIN45, -_SIN45, 0.0], [ _SIN45,  _SIN45, 0.0],
+    [0.0, 0.0, -1.0], [0.0, 0.0,  1.0],
+    [0.0, 0.0,  1.0], [0.0, 0.0, -1.0]
+]
 
 
 BUOYANCY_NET = 2.0 
@@ -16,6 +30,10 @@ BUOYANCY_NET = 2.0
 class MPCControllerBlueROV(Node):
     def __init__(self):
         super().__init__('mpc_controller_bluerov')
+        
+        # --- Parameters ---
+        if not self.has_parameter('use_sim_time'):
+            self.declare_parameter('use_sim_time', True)
 
         self.pubs = []
         for i in range(1, 9):
@@ -23,9 +41,11 @@ class MPCControllerBlueROV(Node):
                 self.create_publisher(Float64, f'/cmd_vel_{i}', 10)
             )
 
+        # Primary state source: /odometry/filtered (EKF sensor fusion)
         self.sub_odom = self.create_subscription(
-            Odometry, '/odom', self.odom_callback, 10
+            Odometry, '/odometry/filtered', self.odom_callback, 10
         )
+        # Secondary/comparison: Gazebo truth (kept for logging)
         self.sub_odom_exacte = self.create_subscription(
             Odometry, '/odom', self.odom_callback_exacte, 10
         )
@@ -34,6 +54,7 @@ class MPCControllerBlueROV(Node):
         self.current_state = np.zeros(8)
         self.current_state_exacte = np.zeros(8)
         self.odom_received = False
+        self.get_logger().info("Waiting for first odometry on /odometry/filtered...")
 
 
         self.setup_mpc()
@@ -183,7 +204,7 @@ class MPCControllerBlueROV(Node):
             + yaw_err
         )
         # Velocity damping: penalizes fast surge/sway to prevent oscillation
-        lterm = mterm + 15.0 * r**2 + 5.0 * u**2 + 5.0 * v**2
+        lterm = mterm + 15.0 * r**2 + 20.0 * u**2 + 20.0 * v**2
 
         lterm += 0.01 * (t1**2 + t2**2 + t3**2 + t4**2   # ↑ from 0.001 (penalizes large thrusts)
                        + t5**2 + t6**2 + t7**2 + t8**2)
@@ -227,10 +248,10 @@ class MPCControllerBlueROV(Node):
         self.mpc.set_nl_cons('eq_roll_max',  roll_torque, ub=0.5)
         self.mpc.set_nl_cons('eq_roll_min', -roll_torque, ub=0.5)
 
-        self.mpc.set_nl_cons('u_max',  u_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
-        self.mpc.set_nl_cons('u_min', -u_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
-        self.mpc.set_nl_cons('r_max',  r_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
-        self.mpc.set_nl_cons('r_min', -r_state, ub=2.0,  soft_constraint=True, penalty_term_cons=100)
+        self.mpc.set_nl_cons('u_max',  u_state, ub=0.8,  soft_constraint=True, penalty_term_cons=100)
+        self.mpc.set_nl_cons('u_min', -u_state, ub=0.8,  soft_constraint=True, penalty_term_cons=100)
+        self.mpc.set_nl_cons('r_max',  r_state, ub=1.0,  soft_constraint=True, penalty_term_cons=100)
+        self.mpc.set_nl_cons('r_min', -r_state, ub=1.0,  soft_constraint=True, penalty_term_cons=100)
 
         self.mpc.setup()
         self.mpc.set_initial_guess()
@@ -262,6 +283,11 @@ class MPCControllerBlueROV(Node):
             return
 
         try:
+            # First solve log
+            if not hasattr(self, '_first_solve_done'):
+                self.get_logger().info("Starting control loop (First odom received)")
+                self._first_solve_done = True
+                
             x0 = self.current_state.reshape(-1, 1)
 
             t0 = time.perf_counter()
@@ -298,7 +324,7 @@ class MPCControllerBlueROV(Node):
                 dist = math.sqrt((s[0]-t[0])**2 + (s[1]-t[1])**2 + (s[2]-t[2])**2)
                 self.get_logger().info(
                     f"dist={dist:.2f}m  solve={solve_ms:.0f}ms\n"
-                    f"pos=({s[0]:.2f},{s[1]:.2f},{s[2]:.2f}) "
+                    f"pos vu=({s[0]:.2f},{s[1]:.2f},{s[2]:.2f}) "
                     f"pos exacte=({s2[0]:.2f},{s2[1]:.2f},{s2[2]:.2f}) "
                     f"psi={math.degrees(s[3]):.0f}°\n"
                     f"→ tgt=({t[0]:.1f},{t[1]:.1f},{t[2]:.1f})\n"
