@@ -60,6 +60,10 @@ Now, let's start the virtual pool and put the robot inside it. In the same termi
   ```bash
   ros2 launch AUV_description bluerov2_bassin_waves.launch.py
   ```
+- **Deep Ocean Simulation** (40m depth + Net):
+  ```bash
+  ros2 launch AUV_description bluerov2_ocean_realistic.launch.py
+  ```
 
 Wait a few moments. A new window (Gazebo) will open showing a 3D pool with the BlueROV2 submarine floating inside. The robot's sensors are now active and gathering data.
 
