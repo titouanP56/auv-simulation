@@ -140,5 +140,5 @@ To visualize the robot's sensors and telemetry (cameras, sonar, 3D pose) in real
    - Open the **Foxglove Studio** app (desktop or web version).
    - Click "**Open connection**".
    - Select "**Foxglove WebSocket**".
-   - Enter the URL: `ws://localhost:8765` (or replace `localhost` with your robot's IP if running on a different machine).
+   - Enter the URL: `ws://172.19.68.228:8765` (or replace `localhost` with your robot's IP if running on a different machine).
    - You can now visualize topics like `/odom`, `/camera/image_raw`, `/ping360/scan`, and 3D models!
