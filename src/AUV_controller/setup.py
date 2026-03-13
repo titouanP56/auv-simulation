@@ -28,7 +28,7 @@ setup(
             'move_down = AUV_controller.tools.move_down:main',
             'mpc_controller_bluerov = AUV_controller.mpc_controller_blueROV:main',
             'mpc_controller_sensors = AUV_controller.mpc_controller_sensors:main',
-            'mpc_controller_realistic = AUV_controller.bluerov.mpc_controller_realistic:main',
+            'mpc_controller_realistic = AUV_controller.mpc_controller_realistic:main',
             'station_keeping = AUV_controller.station_keeping:main',
         ],
     },

@@ -15,7 +15,7 @@ from std_msgs.msg import Float64
 import math
 
 # Thruster force to command conversion coefficients (from URDF)
-THRUST_COEFFS = [-0.02, 0.02, 0.02, -0.02, -0.02, 0.02, 0.02, -0.02]
+THRUST_COEFFS = [-0.02, 0.02, -0.02, 0.02, -0.02, 0.02, 0.02, -0.02]
 RHO = 1025.0
 
 class MoveDownNode(Node):

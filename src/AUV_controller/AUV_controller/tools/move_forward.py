@@ -15,7 +15,7 @@ from std_msgs.msg import Float64
 import math
 
 # Thruster force to command conversion coefficients (from URDF)
-THRUST_COEFFS = [-0.002, 0.002, 0.002, -0.002, -0.002, 0.002, 0.002, -0.002]
+THRUST_COEFFS = [-0.02, 0.02, -0.02, 0.02, -0.02, 0.02, 0.02, -0.02]
 RHO = 997.0 
 
 class MoveForwardNode(Node):
@@ -79,7 +79,7 @@ class MoveForwardNode(Node):
         
         # Hardcoded thruster commands for pure forward movement
         # 5N on t1, t2 and -5N on t3, t4 pushes the robot forward
-        cmd = [5, 5, -5, -5, 0.0, 0.0, 0.0, 0.0]
+        cmd = [-5, 5, -5, 5, 0.0, 0.0, 0.0, 0.0]
         
         self.get_logger().info(f"Poussée globale : {current_F_surge:.1f} N | T1-T4 : {t1:.1f} N")
 

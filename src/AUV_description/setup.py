@@ -11,8 +11,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/world', ['world/Bassin_ntnu.xml', 'world/Bassin_ntnu_waves.xml', 'world/ocean_40m.xml']),
-        ('share/' + package_name + '/urdf', ['urdf/BlueROV2.urdf.xml', 'urdf/BlueROV2captors.urdf.xml', 'urdf/bluerov2_realistic.urdf.xacro']),
-        ('share/' + package_name + '/launch', ['launch/bluerov2_bassin.launch.py', 'launch/bluerov2_bassin_captors.launch.py', 'launch/test_bluerov2_realistic.launch.py', 'launch/bluerov2_bassin_waves.launch.py', 'launch/bluerov2_ocean_realistic.launch.py']),
+        ('share/' + package_name + '/urdf', ['urdf/BlueROV2.urdf.xml', 'urdf/BlueROV2captors.urdf.xml', 'urdf/Bluerov2_realistic.urdf.xml']),
+        ('share/' + package_name + '/launch', ['launch/bluerov2_bassin.launch.py', 'launch/bluerov2_bassin_captors.launch.py', 'launch/bluerov2_bassin_waves.launch.py', 'launch/bluerov2_ocean_realistic.launch.py', 'launch/bluerov2_realist_bassin.launch.py']),
         ('share/' + package_name + '/meshes/bluerov2', [
             'meshes/bluerov2/ping360_mount.STL',
             'meshes/bluerov2/ECHO.STL',

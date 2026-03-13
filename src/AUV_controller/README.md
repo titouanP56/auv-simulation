@@ -15,7 +15,6 @@ It implements controllers ranging from Station Keeping using PID to Model Predic
 The package is structured to offer several levels of control:
 
 ### 1. Advanced Controllers (Navigation)
-- **`mpc_controller_realistic.py`**: Similar to the sensors version but tuned specifically for the realistic BlueROV2 model.
 - **`mpc_controller_sensors.py`**: Main MPC controller designed to work with the robot's sensors. Subscribes to `/odometry/filtered` and calculates optimal thruster commands.
 - **`station_keeping.py`**: Robust and fast PID controller to maintain the AUV at a stable `(x, y, z, yaw)` position.
 - **`mpc_controller_blueROV.py`**: Theoretical version of the MPC, subscribing directly to exact ground truth `/odom`.

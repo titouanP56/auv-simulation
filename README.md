@@ -46,7 +46,7 @@ Now, let's start the virtual pool and put the robot inside it. In the same termi
 
 - **Realistic Simulation** :
   ```bash
-  ros2 launch AUV_description test_bluerov2_realistic.launch.py
+  ros2 launch AUV_description bluerov2_realist_bassin.launch.py
   ```
 - **Equipped with sensors** (classic):
   ```bash
@@ -87,10 +87,6 @@ Here is the list of scripts you can launch to move the robot:
 - **Station Keeping**: Makes the robot hold its current position.
   ```bash
   ros2 run AUV_controller station_keeping
-  ```
-- **MPC Realistic**: **[Optimized]** Advanced Model Predictive Control tuned for the realistic BlueROV2 model.
-  ```bash
-  ros2 run AUV_controller mpc_controller_realistic
   ```
 - **MPC with Sensors**: Standard MPC using real sensor data (EKF odometry) to navigate.
   ```bash
