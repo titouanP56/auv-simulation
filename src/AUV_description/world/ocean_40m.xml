@@ -18,10 +18,10 @@
 
     <plugin filename="gz-sim-buoyancy-system" name="gz::sim::systems::Buoyancy">
       <graded_buoyancy>
-        <default_density>1025</default_density>
+        <default_density>997</default_density>
         <density_change>
           <above_depth>0</above_depth>
-          <density>1.2</density>
+          <density>1</density>
         </density_change>
       </graded_buoyancy>
     </plugin>
@@ -36,7 +36,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>1000 1000</size>
+              <size>100 100</size>
             </plane>
           </geometry>
           <material>
@@ -77,7 +77,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>1000 1000</size>
+              <size>100 100</size>
             </plane>
           </geometry>
           <material>
@@ -88,59 +88,33 @@
       </link>
     </model>
 
-    <!-- Net Model (Cylinder + Cone) -->
+    <!-- Net Model (FBX) -->
     <model name="fish_net">
       <static>true</static>
-      <pose>0 0 0 0 0 0</pose>
+      <!-- Position du filet (x, y, z, roll, pitch, yaw) -->
+      <!-- Si le haut est vers la gauche (axe -Y), on tourne de 90° (1.5708 rad) sur l'axe X (roll) -->
+      <!-- Si le haut est sur l'axe -X, on tourne sur l'axe Y (pitch) -->
+      <pose>0 0 0 1.5708 0 0</pose>
       <link name="net_link">
-        
-        <!-- Cylindrical part -->
-        <visual name="cylinder_visual">
-          <pose>0 0 -7.5 0 0 0</pose>
+        <visual name="net_visual">
+          <pose>0 0 0 0 0 0</pose>
           <geometry>
-            <cylinder>
-              <radius>25.0</radius>
-              <length>15.0</length>
-            </cylinder>
+            <mesh>
+              <!-- Utilisation du chemin relatif au package ROS 2 -->
+              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
+              <!-- Toujours utiliser les 3 MEMES valeurs pour ne pas déformer le cercle -->
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
           </geometry>
-          <material>
-            <ambient>1.0 1.0 1.0 0.7</ambient>
-            <diffuse>1.0 1.0 1.0 0.7</diffuse>
-            <specular>0.5 0.5 0.5 0.7</specular>
-          </material>
         </visual>
-        <collision name="cylinder_collision">
-          <pose>0 0 -7.5 0 0 0</pose>
+        <collision name="net_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry>
-            <cylinder>
-              <radius>25.0</radius>
-              <length>15.0</length>
-            </cylinder>
-          </geometry>
-        </collision>
-
-        <!-- Conical bottom part -->
-        <visual name="cone_visual">
-          <pose>0 0 -22.5 3.14159 0 0</pose> <!-- Rotated 180 degrees to point down -->
-          <geometry>
-            <cone>
-              <radius>25.0</radius>
-              <length>15.0</length>
-            </cone>
-          </geometry>
-          <material>
-            <ambient>1.0 1.0 1.0 0.7</ambient>
-            <diffuse>1.0 1.0 1.0 0.7</diffuse>
-            <specular>0.5 0.5 0.5 0.7</specular>
-          </material>
-        </visual>
-        <collision name="cone_collision">
-          <pose>0 0 -22.5 3.14159 0 0</pose>
-          <geometry>
-            <cone>
-              <radius>25.0</radius>
-              <length>15.0</length>
-            </cone>
+            <mesh>
+              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
+              <!-- La collision DOIT matcher le mesh visuel pour éviter les bugs physiques -->
+              <scale>0.01 0.01 0.01</scale>
+            </mesh>
           </geometry>
         </collision>
       </link>

@@ -11,6 +11,7 @@ This package contains the robot description (URDF/Xacro), Gazebo simulation worl
 ## Package Structure
 - `urdf/`: URDF and Xacro description files for the AUVs.
 - `world/`: Gazebo simulation environments (in SDF/XML format).
+- `models/`: 3D models and assets (e.g., `fish_net` FBX meshes) loaded dynamically via ROS 2 `package://` URIs.
 - `launch/`: ROS 2 launch scripts.
 - `AUV_description/`: Python scripts (ROS 2 nodes) for sensor data processing.
 

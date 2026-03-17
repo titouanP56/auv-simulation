@@ -1,80 +1,88 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-import xacro
+from launch.substitutions import Command
+from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
+    """
+    Launch file for the fully equipped BlueROV2 simulation in a water basin.
+    
+    This launch file:
+    1. Starts Gazebo Harmonic with a specific world.
+    2. Spawns the BlueROV2 URDF (equipped with sensors) into the simulation.
+    3. Bridges Gazebo topics to ROS 2 topics (Thrusters, Odometry, Camera, Sonars, IMU, Clock).
+    4. Launches necessary helper nodes (Robot State Publisher, Depth Sensor Simulator, DVL bridge, IMU repurblisher).
+    5. Starts the robot_localization EKF node.
+    6. Publishes static transforms to link Gazebo generated frames to the ROS TF tree.
+    """
+    pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_auv_description = get_package_share_directory('AUV_description')
-    pkg_ros_gz_sim      = get_package_share_directory('ros_gz_sim')
-    pkg_localization    = get_package_share_directory('my_auv_localization')
 
-    # ── URDF / XACRO ────────────────────────────────────────────────────
-    xacro_file = os.path.join(pkg_auv_description, 'urdf', 'bluerov2_realistic.urdf.xacro')
-    doc = xacro.parse(open(xacro_file))
-    xacro.process_doc(doc)
-    robot_description = {'robot_description': doc.toxml()}
+    sdf_file = os.path.join(pkg_auv_description, 'world', 'ocean_40m.xml')
+    urdf_file = os.path.join(pkg_auv_description, 'urdf', 'Bluerov2_realistic.urdf.xml')
 
-    # ── Gazebo simulation ────────────────────────────────────────────────
-    # Using the 40m deep ocean world
-    world_file = os.path.join(pkg_auv_description, 'world', 'ocean_40m.xml')
+    # Parse Xacro/URDF file into an XML string
+    xacro_file = Command(['xacro ', urdf_file])
+
+    # 1. Start Gazebo Sim
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
-        # Adding -v 4 for verbose output to help debugging if needed
-        launch_arguments={'gz_args': f'-r -v 4 {world_file}'}.items(),
+        launch_arguments={'gz_args': f'-r {sdf_file}'}.items(),
     )
 
-    # ── Spawn robot ──────────────────────────────────────────────────────
-    spawn_entity = Node(
+    # 2. Spawn the robot model in Gazebo
+    create_entity = Node(
         package='ros_gz_sim',
         executable='create',
-        arguments=['-string', doc.toxml(),
-                   '-name', 'bluerov2_realistic',
-                   '-allow_renaming', 'true',
-                   # Spawn at z=-1 to be underwater
-                   '-x', '0.0', '-y', '0.0', '-z', '-1'],
+        arguments=['-topic', 'robot_description',
+                   '-name', 'BlueROV2',
+                   '-string', xacro_file,
+                   '-z', '-0.3'], # Spawn slightly underwater to avoid floor collision if any
         output='screen'
     )
 
-    # ── Robot State Publisher ────────────────────────────────────────────
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[robot_description],
-    )
-
-    # ── Gazebo ↔ ROS Bridges ─────────────────────────────────────────────
+    # 3. Setup bridges between Gazebo (gz) and ROS 2
     bridge_args = []
     bridge_remappings = []
 
-    # Thruster commands (ROS → Gz)
+    # Bridge for 8 thrusters: Gazebo Double -> ROS 2 Float64
     for i in range(1, 9):
-        gz_topic  = f'/model/bluerov2_realistic/joint/thruster_{i}_joint/cmd_thrust'
+        gz_topic = f'/model/BlueROV2/joint/thruster_{i}_joint/cmd_thrust'
         ros_topic = f'/cmd_vel_{i}'
         bridge_args.append(f'{gz_topic}@std_msgs/msg/Float64]gz.msgs.Double')
         bridge_remappings.append((gz_topic, ros_topic))
 
-    # Odometry (Gz → ROS /odom)
-    bridge_args.append('/model/bluerov2_realistic/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry')
-    bridge_remappings.append(('/model/bluerov2_realistic/odometry', '/odom'))
+    # Add Ground Truth Odometry bridge
+    bridge_args.append('/model/BlueROV2/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry')
+    bridge_remappings.append(('/model/BlueROV2/odometry', '/odom'))
 
-    # TF (Gz → ROS)
-    bridge_args.append('/model/bluerov2_realistic/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V')
-    bridge_remappings.append(('/model/bluerov2_realistic/tf', '/tf'))
+    # Add Camera Image bridge
+    bridge_args.append('/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image')
+    bridge_remappings.append(('/camera/image_raw', '/camera/image_raw'))
 
-    # IMU (Gz → ROS)
-    bridge_args.append('/model/bluerov2_realistic/imu@sensor_msgs/msg/Imu[gz.msgs.IMU')
-    bridge_remappings.append(('/model/bluerov2_realistic/imu', '/imu/fixed'))
-
-    # Clock (Gz → ROS)
+    # Add Clock bridge (Essential for use_sim_time synchronization)
     bridge_args.append('/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock')
+    bridge_remappings.append(('/clock', '/clock'))
 
+    # Add Ping360 Sonar bridge (Gazebo gpu_lidar -> ROS 2 LaserScan)
+    bridge_args.append('/ping360/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan')
+    bridge_remappings.append(('/ping360/scan', '/ping360/scan'))
+
+    # Add Sonoptix Echo bridge (Gazebo 2D gpu_lidar -> ROS 2 PointCloud2)
+    bridge_args.append('/sonoptix/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked')
+    bridge_remappings.append(('/sonoptix/points', '/sonoptix/points'))
+
+    # Add Raw IMU bridge
+    bridge_args.append('/imu@sensor_msgs/msg/Imu[gz.msgs.IMU')
+    bridge_remappings.append(('/imu', '/imu'))
+
+    # Execute the bridge node with all configurations
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -84,8 +92,27 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
-    # ── DVL bridge ──────────────────────────────────────────────────────
-    dvl_bridge = Node(
+    # 4. Helper Nodes
+    # Publish URDF links to TF tree
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='both',
+        parameters=[{'robot_description': ParameterValue(xacro_file, value_type=str), 'use_sim_time': True}],
+    )
+
+    # Simulates a noisy depth sensor from /odom
+    simulated_depth_sensor = Node(
+        package='AUV_description',
+        executable='simulated_depth_sensor',
+        name='simulated_depth_sensor',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
+    # Converts Gazebo's custom DVL messages to ROS 2 TwistWithCovarianceStamped
+    dvl_bridge_node = Node(
         package='auv_dvl_bridge',
         executable='dvl_bridge_node',
         name='dvl_bridge_node',
@@ -93,37 +120,54 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
-    # ── Simulated Depth Sensor ──────────────────────────────────────────
-    depth_sensor = Node(
-        package='AUV_description', # Note: logic indicates it's in this pkg
-        executable='simulated_depth_sensor',
-        name='simulated_depth_sensor',
+    # Republish /imu with realistic non-zero covariances (Gazebo publishes all-zero covariances causing EKF issues)
+    imu_republisher = Node(
+        package='AUV_description',
+        executable='imu_republisher',
+        name='imu_republisher',
         output='screen',
         parameters=[{'use_sim_time': True}]
     )
 
-    # ── EKF (robot_localization) ─────────────────────────────────────────
-    ekf_config = os.path.join(pkg_localization, 'config', 'ekf.yaml')
-    ekf_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_filter_node',
-        output='screen',
-        parameters=[ekf_config, {'use_sim_time': True}],
-        remappings=[('odometry/filtered', '/odometry/filtered')],
+    # 5. Start State Estimation (Extended Kalman Filter)
+    pkg_my_auv_localization = get_package_share_directory('my_auv_localization')
+    robot_localization_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_my_auv_localization, 'launch', 'localization.launch.py')
+        )
     )
 
-    # ── Static Transforms ────────────────────────────────────────────────
-    static_tf_world_odom = Node(
+    # 6. Static TF Publishers
+    # Gazebo plugins often append the model/link name to the frame_id.
+    # These static transforms link the ROS URDF frames to the Gazebo frames
+    # so data from the sensors is correctly positioned on the robot.
+
+    # Static transform to link URDF's ping360_link with Gazebo's auto-generated frame
+    ping360_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='static_tf_world_odom',
-        arguments=['0', '0', '0', '0', '0', '0', 'world', 'odom'],
-        parameters=[{'use_sim_time': True}]
+        name='ping360_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'ping360_link', 'BlueROV2/base_link/ping360_sonar']
+    )
+
+    # Static transform for IMU frame
+    imu_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='imu_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'BlueROV2/base_link/imu_sensor']
+    )
+
+    # Static transform to link URDF's sonoptix_link with Gazebo's auto-generated frame
+    sonoptix_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='sonoptix_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'sonoptix_link', 'BlueROV2/base_link/sonoptix_sonar']
     )
 
     # ── Gazebo Resource Path ─────────────────────────────────────────────
-    # Necessary for Gazebo to find meshes
+    from launch.actions import SetEnvironmentVariable
     gz_resource_path = SetEnvironmentVariable(
         name='GZ_SIM_RESOURCE_PATH',
         value=[os.path.join(get_package_share_directory('AUV_description'), '..')]
@@ -132,11 +176,14 @@ def generate_launch_description():
     return LaunchDescription([
         gz_resource_path,
         gz_sim,
-        spawn_entity,
+        create_entity,
         robot_state_publisher,
         bridge,
-        dvl_bridge,
-        depth_sensor,
-        ekf_node,
-        static_tf_world_odom,
+        simulated_depth_sensor,
+        dvl_bridge_node,
+        imu_republisher,
+        robot_localization_launch,
+        ping360_tf,
+        imu_tf,
+        sonoptix_tf,
     ])

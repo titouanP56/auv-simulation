@@ -25,6 +25,9 @@ setup(
             'meshes/bluerov2/PING360.dae',
             'meshes/bluerov2/bluerov2.stl'
         ]),
+        ('share/' + package_name + '/models/fish_net/meshes', [
+            'models/fish_net/meshes/fish_net.fbx'
+        ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
