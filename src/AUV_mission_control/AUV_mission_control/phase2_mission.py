@@ -33,6 +33,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan, PointCloud2
+from geometry_msgs.msg import TransformStamped, PoseStamped
+from tf2_ros import TransformBroadcaster
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -42,7 +44,7 @@ DEPTH_TOLERANCE   = 0.20    # [m]  we're "at depth" when |z_error| < this
                             #       (widened: P-only ctrl has steady-state error ~0.13 m)
 DEPTH_HOLD_TIME   = 2.0     # [s]  must stay within tolerance before transitioning
 
-YAW_TOLERANCE     = math.radians(5.0)  # [rad]  aligned when |yaw_error| < this
+YAW_TOLERANCE     = math.radians(8.0)  # [rad]  aligned when |yaw_error| < this
 YAW_HOLD_TIME     = 1.0                # [s]
 
 STANDOFF_DIST     = 1.5     # [m]  desired distance to net wall
@@ -55,13 +57,13 @@ KP_DEPTH  = 12.0   # [N/m]
 # (From station_keeping.py BUOYANCY_NET = 2.0, but we use a bit more for margin)
 BUOYANCY_COMPENSATION = 3.0  # [N] applied continuously downwards
 # P-gain for yaw alignment (horizontal thruster differential)
-KP_YAW    = 6.0    # [N·m/rad]
-KD_YAW    = 4.0    # [N·m·s/rad] D-gain to dampen oscillation
+KP_YAW    = 5.0    # [N·m/rad] Matches proven station_keeping.py gains
+KD_YAW    = 2.0    # [N·m·s/rad]
 # P-gain for forward approach
 KP_SURGE  = 4.0    # [N/m]
 
 MAX_DEPTH_CMD   = 20.0   # [N]   clamp on vertical thrust per thruster
-MAX_YAW_CMD     = 15.0   # [N]   clamp on yaw differential per thruster
+MAX_YAW_CMD     = 40.0   # [N·m] clamp on total yaw torque (allows higher differential thrust)
 MAX_SURGE_CMD   = 15.0   # [N]   clamp on surge thrust per thruster
 
 # Ping360 detection: ignore beams that report max-range (likely no return)
@@ -70,7 +72,7 @@ PING360_IGNORE_THRESHOLD = 0.95   # fraction of max_range
 # Sonoptix: only look at beams within this horizontal half-angle of boresight
 SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)  # ±20°
 
-CONTROL_RATE_HZ = 10.0   # [Hz]  main control loop rate
+CONTROL_RATE_HZ = 20.0   # [Hz]  main control loop rate (increased to prevent discrete time oscillation)
 # ── Thruster Allocation (from station_keeping.py — proven with Gazebo) ─────────
 # Thrust coefficient sign per thruster (from URDF).  The sign must be applied
 # to the final command so Gazebo's propeller plugin produces force in the
@@ -194,8 +196,11 @@ class Phase2MissionNode(Node):
             self.create_publisher(Float64, f'/cmd_vel_{i}', 10)
             for i in range(1, 9)
         ]
-        self.phase_pub  = self.create_publisher(String, '/mission/phase', 10)
-        self.done_pub   = self.create_publisher(Bool,   '/mission/phase2_done', 10)
+        self.phase_pub   = self.create_publisher(String, '/mission/phase', 10)
+        self.done_pub    = self.create_publisher(Bool,   '/mission/phase2_done', 10)
+        self.origin_pub  = self.create_publisher(PoseStamped, '/mission/local_origin', 10)
+
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # ── State ────────────────────────────────────────────────────────────
         self.state: str = State.DESCENDING
@@ -203,6 +208,10 @@ class Phase2MissionNode(Node):
         self.current_z:    float = 0.0
         self.current_yaw:  float = 0.0
         self.current_vyaw: float = 0.0  # angular velocity Z
+        
+        # Store full odom position for calculating origin
+        self.current_x: float = 0.0
+        self.current_y: float = 0.0
 
         self.target_yaw: float = 0.0   # bearing to nearest net edge (set in SCANNING)
         self.sonoptix_range: float | None = None
@@ -223,6 +232,8 @@ class Phase2MissionNode(Node):
     # ── Subscribers callbacks ─────────────────────────────────────────────────
 
     def _odom_cb(self, msg: Odometry):
+        self.current_x    = msg.pose.pose.position.x
+        self.current_y    = msg.pose.pose.position.y
         self.current_z    = msg.pose.pose.position.z
         self.current_yaw  = _yaw_from_odom(msg)
         self.current_vyaw = msg.twist.twist.angular.z
@@ -390,6 +401,53 @@ class Phase2MissionNode(Node):
             self.get_logger().info(
                 f"[APPROACHING → STANDOFF] Reached {self.sonoptix_range:.2f} m standoff!")
             self.state = State.STANDOFF
+            self._define_local_origin()
+
+    def _define_local_origin(self):
+        """Phase 3: Capture the current position and define the net's local origin."""
+        # The exact origin on the net wall is STANDOFF_DIST meters directly extending 
+        # from our current position along our target heading.
+        origin_x = self.current_x + STANDOFF_DIST * math.cos(self.target_yaw)
+        origin_y = self.current_y + STANDOFF_DIST * math.sin(self.target_yaw)
+        origin_z = self.current_z 
+        
+        # We want the origin's X-axis to point outwards from the net (opposite to our heading)
+        # So X points back towards the AUV, Y points along the net wall tangentially.
+        origin_yaw = self.target_yaw + math.pi
+
+        self.get_logger().info(f"[PHASE 3] Defined Local Origin at: x={origin_x:.2f}, y={origin_y:.2f}, z={origin_z:.2f}, yaw={math.degrees(origin_yaw):.1f}°")
+
+        # 1. Store locally for constant broadcasting
+        self._local_origin_transform = TransformStamped()
+        self._local_origin_transform.header.frame_id = 'odom'
+        self._local_origin_transform.child_frame_id = 'local_origin'
+        self._local_origin_transform.transform.translation.x = origin_x
+        self._local_origin_transform.transform.translation.y = origin_y
+        self._local_origin_transform.transform.translation.z = origin_z
+        
+        # Quaternion for pure yaw rotation: [0, 0, sin(yaw/2), cos(yaw/2)]
+        qx = 0.0
+        qy = 0.0
+        qz = math.sin(origin_yaw / 2.0)
+        qw = math.cos(origin_yaw / 2.0)
+
+        self._local_origin_transform.transform.rotation.x = qx
+        self._local_origin_transform.transform.rotation.y = qy
+        self._local_origin_transform.transform.rotation.z = qz
+        self._local_origin_transform.transform.rotation.w = qw
+
+        # 2. Publish as PoseStamped
+        pose_msg = PoseStamped()
+        pose_msg.header.frame_id = 'odom'
+        pose_msg.header.stamp = self.get_clock().now().to_msg()
+        pose_msg.pose.position.x = origin_x
+        pose_msg.pose.position.y = origin_y
+        pose_msg.pose.position.z = origin_z
+        pose_msg.pose.orientation.x = qx
+        pose_msg.pose.orientation.y = qy
+        pose_msg.pose.orientation.z = qz
+        pose_msg.pose.orientation.w = qw
+        self.origin_pub.publish(pose_msg)
 
     def _do_standoff(self):
         """Hold position at standoff; publish mission done."""
@@ -408,6 +466,11 @@ class Phase2MissionNode(Node):
         done_msg = Bool()
         done_msg.data = True
         self.done_pub.publish(done_msg)
+
+        # Broadcast the fixed local origin TF continuously
+        if hasattr(self, '_local_origin_transform'):
+            self._local_origin_transform.header.stamp = self.get_clock().now().to_msg()
+            self.tf_broadcaster.sendTransform(self._local_origin_transform)
 
     def _set_Fz(self, fz: float):
         """Set desired heave force (+ = up, − = down in body/world Z)."""
