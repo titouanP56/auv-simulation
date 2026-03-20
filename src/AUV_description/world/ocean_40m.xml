@@ -107,14 +107,23 @@
             </mesh>
           </geometry>
         </visual>
-        <collision name="net_collision">
-          <pose>0 0 0 0 0 0</pose>
+        <collision name="net_cylinder_collision">
+          <pose>0 0 -7.5 0 0 0</pose> 
           <geometry>
-            <mesh>
-              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
-              <!-- La collision DOIT matcher le mesh visuel pour éviter les bugs physiques -->
-              <scale>0.01 0.01 0.01</scale>
-            </mesh>
+            <cylinder>
+              <radius>25.0</radius>
+              <length>15.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+
+        <collision name="net_cone_collision">
+          <pose>0 0 -22.5 0 0 0</pose> 
+          <geometry>
+            <cone>
+              <radius>25.0</radius> 
+              <length>15.0</length> 
+            </cone>
           </geometry>
         </collision>
       </link>

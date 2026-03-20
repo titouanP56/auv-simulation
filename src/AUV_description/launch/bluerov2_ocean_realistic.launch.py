@@ -51,13 +51,31 @@ def generate_launch_description():
 
     # ── Phase 1: sample a random realistic spawn pose ─────────────────────────
     # Net diameter = ~25 m radius; AUV can drop anywhere within 20 m of center.
-    NET_SPAWN_RADIUS = 20.0   # [m] max distance from net center
-    NET_CENTER_X     = 0.0    # [m] net center in world frame (adjust if needed)
-    NET_CENTER_Y     = 0.0    # [m] net center in world frame (adjust if needed)
+    #NET_SPAWN_RADIUS = 20.0   # [m] max distance from net center
+    #NET_CENTER_X     = 0.0    # [m] net center in world frame (adjust if needed)
+    #NET_CENTER_Y     = 0.0    # [m] net center in world frame (adjust if needed)
 
-    spawn_dx, spawn_dy = _random_spawn_in_circle(NET_SPAWN_RADIUS)
-    spawn_x   = NET_CENTER_X + spawn_dx
-    spawn_y   = NET_CENTER_Y + spawn_dy
+    #spawn_dx, spawn_dy = _random_spawn_in_circle(NET_SPAWN_RADIUS)
+    #spawn_x   = NET_CENTER_X + spawn_dx
+    #spawn_y   = NET_CENTER_Y + spawn_dy
+
+# Constantes
+    NET_SPAWN_RADIUS = 22.0   # Rayon fixe
+    NET_CENTER_X     = 0.0
+    NET_CENTER_Y     = 0.0
+
+# 1. On choisit un angle aléatoire entre 0 et 2*PI
+    angle = random.uniform(0, 2 * math.pi)
+
+# 2. On calcule la position sur la circonférence
+    spawn_dx = NET_SPAWN_RADIUS * math.cos(angle)
+    spawn_dy = NET_SPAWN_RADIUS * math.sin(angle)
+
+# 3. Position finale dans le monde
+    spawn_x = NET_CENTER_X + spawn_dx
+    spawn_y = NET_CENTER_Y + spawn_dy
+
+
     spawn_z   = random.uniform(-0.5, 0.0)           # near surface
     spawn_yaw = random.uniform(-math.pi, math.pi)   # fully random heading
 

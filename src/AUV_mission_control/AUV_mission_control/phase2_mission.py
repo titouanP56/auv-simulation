@@ -5,21 +5,6 @@ AUV Net Inspection — Phase 2: Descent and Edge Finding
 
 State machine:
     DESCENDING  →  SCANNING  →  ALIGNING  →  APPROACHING  →  STANDOFF
-
-Control strategy (Option A — direct P-controllers on thrusters):
-  - Depth control  : vertical thrusters (T5‑T8) driven by a P-controller on z error.
-  - Yaw control    : lateral thruster differential (T1‑T4) driven by P on yaw error.
-  - Surge control  : forward thrusters (T1+T4 top pair) driven by P on distance error.
-
-Topics consumed:
-  /odom                  (nav_msgs/Odometry)         — position + orientation
-  /ping360/scan          (sensor_msgs/LaserScan)     — 360° sonar (edge detection)
-  /sonoptix/points       (sensor_msgs/PointCloud2)   — forward multibeam sonar
-
-Topics published:
-  /cmd_vel_1 … /cmd_vel_8  (std_msgs/Float64)        — individual thruster commands
-  /mission/phase         (std_msgs/String)            — current state name (for monitoring)
-  /mission/phase2_done   (std_msgs/Bool)              — True when STANDOFF reached
 """
 
 import math
@@ -39,63 +24,46 @@ from tf2_ros import TransformBroadcaster
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-TARGET_DEPTH      = -2.0    # [m]  desired diving depth (NED: negative = down)
-DEPTH_TOLERANCE   = 0.20    # [m]  we're "at depth" when |z_error| < this
-                            #       (widened: P-only ctrl has steady-state error ~0.13 m)
-DEPTH_HOLD_TIME   = 2.0     # [s]  must stay within tolerance before transitioning
+TARGET_DEPTH      = -2.0    # [m]
+DEPTH_TOLERANCE   = 0.20    # [m]
+DEPTH_HOLD_TIME   = 2.0     # [s]
 
-YAW_TOLERANCE     = math.radians(8.0)  # [rad]  aligned when |yaw_error| < this
-YAW_HOLD_TIME     = 1.0                # [s]
+YAW_TOLERANCE     = math.radians(8.0)
+YAW_HOLD_TIME     = 1.0     # [s]
 
-STANDOFF_DIST     = 1.5     # [m]  desired distance to net wall
-APPROACH_TOL      = 0.10    # [m]  we've reached standoff when within this margin
+STANDOFF_DIST     = 1.5     # [m]
+APPROACH_TOL      = 0.10    # [m]
 
-# P-gain for depth hold (vertical thrusters T5‑T8)
-KP_DEPTH  = 12.0   # [N/m] 
+KP_DEPTH  = 12.0
+BUOYANCY_COMPENSATION = 3.0
+KP_YAW    = 5.0
+KD_YAW    = 2.0
+KP_SURGE  = 4.0
 
-# Constant downward force to counteract the net positive buoyancy of the robot
-# (From station_keeping.py BUOYANCY_NET = 2.0, but we use a bit more for margin)
-BUOYANCY_COMPENSATION = 3.0  # [N] applied continuously downwards
-# P-gain for yaw alignment (horizontal thruster differential)
-KP_YAW    = 5.0    # [N·m/rad] Matches proven station_keeping.py gains
-KD_YAW    = 2.0    # [N·m·s/rad]
-# P-gain for forward approach
-KP_SURGE  = 4.0    # [N/m]
+MAX_DEPTH_CMD   = 20.0
+MAX_YAW_CMD     = 40.0
+MAX_SURGE_CMD   = 15.0
 
-MAX_DEPTH_CMD   = 20.0   # [N]   clamp on vertical thrust per thruster
-MAX_YAW_CMD     = 40.0   # [N·m] clamp on total yaw torque (allows higher differential thrust)
-MAX_SURGE_CMD   = 15.0   # [N]   clamp on surge thrust per thruster
+PING360_IGNORE_THRESHOLD = 0.95
+SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)
 
-# Ping360 detection: ignore beams that report max-range (likely no return)
-PING360_IGNORE_THRESHOLD = 0.95   # fraction of max_range
+CONTROL_RATE_HZ = 20.0
 
-# Sonoptix: only look at beams within this horizontal half-angle of boresight
-SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)  # ±20°
-
-CONTROL_RATE_HZ = 20.0   # [Hz]  main control loop rate (increased to prevent discrete time oscillation)
-# ── Thruster Allocation (from station_keeping.py — proven with Gazebo) ─────────
-# Thrust coefficient sign per thruster (from URDF).  The sign must be applied
-# to the final command so Gazebo's propeller plugin produces force in the
-# correct direction.
 THRUST_COEFFS = [-0.002, 0.002, 0.002, -0.002, -0.002, 0.002, 0.002, -0.002]
-
 SIN45 = 0.7071
-LEVER = 0.1697   # moment arm of horizontal thrusters for yaw
+LEVER = 0.1697
 
-# Rows = [Fx, Fy, Fz, Mx, My, Mz]; Cols = [T1..T8]
 TAM = np.array([
-    [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],  # Fx surge
-    [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],  # Fy sway
-    [ 0.0,    0.0,    0.0,    0.0,   -1.0,   1.0,   1.0,  -1.0 ],  # Fz heave
-    [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218], # Mx roll
-    [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ], # My pitch
-    [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],  # Mz yaw
+    [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
+    [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,   -1.0,   1.0,   1.0,  -1.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218],
+    [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ],
+    [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
 ])
 TAM_PINV = np.linalg.pinv(TAM)
+MAX_INDIVIDUAL_THRUST = 20.0
 
-MAX_INDIVIDUAL_THRUST = 20.0  # [N] per thruster
-
-# State names
 class State:
     DESCENDING  = "DESCENDING"
     SCANNING    = "SCANNING"
@@ -104,42 +72,24 @@ class State:
     STANDOFF    = "STANDOFF"
 
 
-# ── Helper: extract yaw from Odometry message ─────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _yaw_from_odom(odom: Odometry) -> float:
-    """Extract yaw (heading) in radians from an Odometry message."""
     q = odom.pose.pose.orientation
-    # Standard quaternion → yaw formula
     siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
     cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
     return math.atan2(siny_cosp, cosy_cosp)
 
-
 def _angle_diff(a: float, b: float) -> float:
-    """Shortest signed angular difference a - b, result in [-π, π]."""
     return math.atan2(math.sin(a - b), math.cos(a - b))
 
-
-# ── Helper: minimum range from Sonoptix PointCloud2 ──────────────────────────
-
 def _min_sonoptix_range(msg: PointCloud2) -> float | None:
-    """
-    Extract the minimum range from the central beam cluster of the Sonoptix.
-    Returns None if no valid points found.
-
-    PointCloud2 (XYZ) — we look at points whose horizontal angle |atan2(y,x)|
-    is within SONOPTIX_BORESIGHT_HALF_ANGLE and compute the Euclidean range.
-    """
-    # Parse fields to find x, y, z offsets
     field_map = {f.name: f for f in msg.fields}
     if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
         return None
 
-    x_off = field_map['x'].offset
-    y_off = field_map['y'].offset
-    z_off = field_map['z'].offset
-    point_step = msg.point_step
-    data = msg.data
+    x_off, y_off, z_off = field_map['x'].offset, field_map['y'].offset, field_map['z'].offset
+    point_step, data = msg.point_step, msg.data
 
     min_range = float('inf')
     for i in range(msg.width * msg.height):
@@ -168,12 +118,6 @@ def _min_sonoptix_range(msg: PointCloud2) -> float | None:
 # ── Main Node ─────────────────────────────────────────────────────────────────
 
 class Phase2MissionNode(Node):
-    """
-    Phase 2: Descent and Edge Finding.
-
-    Transitions: DESCENDING → SCANNING → ALIGNING → APPROACHING → STANDOFF
-    """
-
     def __init__(self):
         super().__init__('phase2_mission')
 
@@ -183,53 +127,28 @@ class Phase2MissionNode(Node):
             depth=1,
         )
 
-        # ── Subscribers ──────────────────────────────────────────────────────
-        self.odom_sub = self.create_subscription(
-            Odometry, '/odom', self._odom_cb, 10)
-        self.ping360_sub = self.create_subscription(
-            LaserScan, '/ping360/scan', self._ping360_cb, best_effort_qos)
-        self.sonoptix_sub = self.create_subscription(
-            PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self._odom_cb, 10)
+        self.ping360_sub = self.create_subscription(LaserScan, '/ping360/scan', self._ping360_cb, best_effort_qos)
+        self.sonoptix_sub = self.create_subscription(PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
 
-        # ── Publishers ───────────────────────────────────────────────────────
-        self._thrust_pubs = [
-            self.create_publisher(Float64, f'/cmd_vel_{i}', 10)
-            for i in range(1, 9)
-        ]
+        self._thrust_pubs = [self.create_publisher(Float64, f'/cmd_vel_{i}', 10) for i in range(1, 9)]
         self.phase_pub   = self.create_publisher(String, '/mission/phase', 10)
-        self.done_pub    = self.create_publisher(Bool,   '/mission/phase2_done', 10)
+        self.done_pub    = self.create_publisher(Bool, '/mission/phase2_done', 10)
         self.origin_pub  = self.create_publisher(PoseStamped, '/mission/local_origin', 10)
-
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # ── State ────────────────────────────────────────────────────────────
         self.state: str = State.DESCENDING
-
-        self.current_z:    float = 0.0
-        self.current_yaw:  float = 0.0
-        self.current_vyaw: float = 0.0  # angular velocity Z
-        
-        # Store full odom position for calculating origin
-        self.current_x: float = 0.0
-        self.current_y: float = 0.0
-
-        self.target_yaw: float = 0.0   # bearing to nearest net edge (set in SCANNING)
+        self.current_x, self.current_y, self.current_z = 0.0, 0.0, 0.0
+        self.current_yaw, self.current_vyaw = 0.0, 0.0
+        self.target_yaw = 0.0
         self.sonoptix_range: float | None = None
 
-        self._depth_ok_since:  float | None = None   # timestamp when depth first OK
-        self._yaw_ok_since:    float | None = None   # timestamp when yaw first OK
+        self._depth_ok_since: float | None = None
+        self._yaw_ok_since: float | None = None
+        self._have_odom, self._have_scan, self._have_points = False, False, False
 
-        self._have_odom:    bool = False
-        self._have_scan:    bool = False
-        self._have_points:  bool = False
-
-        # ── Control timer ────────────────────────────────────────────────────
-        self.timer = self.create_timer(
-            1.0 / CONTROL_RATE_HZ, self._control_loop)
-
+        self.timer = self.create_timer(1.0 / CONTROL_RATE_HZ, self._control_loop)
         self.get_logger().info("Phase2MissionNode started → state: DESCENDING")
-
-    # ── Subscribers callbacks ─────────────────────────────────────────────────
 
     def _odom_cb(self, msg: Odometry):
         self.current_x    = msg.pose.pose.position.x
@@ -240,48 +159,29 @@ class Phase2MissionNode(Node):
         self._have_odom   = True
 
     def _ping360_cb(self, msg: LaserScan):
-        """Find the minimum-range beam in the Ping360 scan (= nearest net wall)."""
         if self.state != State.SCANNING:
-            return  # only process during SCANNING to save CPU
+            return
 
-        max_r = msg.range_max
-        min_r  = float('inf')
-        min_idx = 0
-
-        for i, r in enumerate(msg.ranges):
-            if not math.isfinite(r):
-                continue
-            if r >= max_r * PING360_IGNORE_THRESHOLD:
-                continue  # no return at this angle
-            if r < min_r:
-                min_r  = r
-                min_idx = i
-
+        min_r = min((r for r in msg.ranges if math.isfinite(r) and r < msg.range_max * PING360_IGNORE_THRESHOLD), default=float('inf'))
         if math.isinf(min_r):
             self.get_logger().warn("Ping360: no valid return found — retrying scan")
             return
 
-        # Direction to nearest edge in the sensor (= robot) frame
+        min_idx = msg.ranges.index(min_r)
         angle = msg.angle_min + min_idx * msg.angle_increment
-        self.target_yaw = self.current_yaw + angle  # convert to world frame
+        self.target_yaw = self.current_yaw + angle
 
-        self.get_logger().info(
-            f"[SCANNING] Nearest wall: {min_r:.2f} m at sensor angle "
-            f"{math.degrees(angle):.1f}° → target world yaw "
-            f"{math.degrees(self.target_yaw):.1f}°"
-        )
+        self.get_logger().info(f"[SCANNING] Nearest wall: {min_r:.2f} m → target world yaw {math.degrees(self.target_yaw):.1f}°")
         self._have_scan = True
 
     def _sonoptix_cb(self, msg: PointCloud2):
-        if self.state == State.APPROACHING or self.state == State.STANDOFF:
+        if self.state in (State.APPROACHING, State.STANDOFF):
             self.sonoptix_range = _min_sonoptix_range(msg)
             self._have_points = True
 
-    # ── Control loop ──────────────────────────────────────────────────────────
-
     def _control_loop(self):
         if not self._have_odom:
-            return  # wait for first odometry
+            return
 
         self._publish_state()
 
@@ -296,128 +196,78 @@ class Phase2MissionNode(Node):
         elif self.state == State.STANDOFF:
             self._do_standoff()
 
-    # ── State implementations ─────────────────────────────────────────────────
-
     def _do_descending(self):
-        """Dive to TARGET_DEPTH using vertical thrusters (T5‑T8)."""
-        depth_error = TARGET_DEPTH - self.current_z   # negative = need to go down
-        # P-control + constant feedforward to overcome positive buoyancy
-        depth_cmd   = (KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION
-        depth_cmd   = max(-MAX_DEPTH_CMD, min(MAX_DEPTH_CMD, depth_cmd))
+        depth_error = TARGET_DEPTH - self.current_z
+        depth_cmd = np.clip((KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
+        self._set_Fz(depth_cmd); self._set_Mz(0.0); self._set_Fx(0.0)
 
-        # T5‑T8 are vertical thrusters (indices 4‑7 in 0-based)
-        # Sign convention: positive cmd → upward force on these thrusters
-        # (thrust_coeff alternates; we send raw command which the URDF's
-        # thrust_coefficient sign-flips internally)
-        self._set_Fz(depth_cmd)
-        self._set_Mz(0.0)
-        self._set_Fx(0.0)
-
-        now  = self.get_clock().now().nanoseconds * 1e-9
-        diff = abs(depth_error)
-
-        if diff < DEPTH_TOLERANCE:
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if abs(depth_error) < DEPTH_TOLERANCE:
             if self._depth_ok_since is None:
                 self._depth_ok_since = now
             elif (now - self._depth_ok_since) >= DEPTH_HOLD_TIME:
-                self.get_logger().info(
-                    f"[DESCENDING → SCANNING] Depth stable at {self.current_z:.2f} m")
+                self.get_logger().info(f"[DESCENDING → SCANNING] Depth stable at {self.current_z:.2f} m")
                 self.state = State.SCANNING
                 self._depth_ok_since = None
         else:
             self._depth_ok_since = None
 
     def _do_scanning(self):
-        """Hold depth, zero yaw rate; waiting for Ping360 callback to set target_yaw."""
-        depth_error = TARGET_DEPTH - self.current_z
-        depth_cmd   = (KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION
-        depth_cmd   = max(-MAX_DEPTH_CMD, min(MAX_DEPTH_CMD, depth_cmd))
-        self._set_Fz(depth_cmd)
-        self._set_Mz(0.0)
-        self._set_Fx(0.0)
+        depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
+        self._set_Fz(depth_cmd); self._set_Mz(0.0); self._set_Fx(0.0)
 
         if self._have_scan:
-            self.get_logger().info(
-                f"[SCANNING → ALIGNING] Target yaw: "
-                f"{math.degrees(self.target_yaw):.1f}°")
+            self.get_logger().info(f"[SCANNING → ALIGNING] Target yaw: {math.degrees(self.target_yaw):.1f}°")
             self.state = State.ALIGNING
             self._have_scan = False
 
     def _do_aligning(self):
-        """Rotate to face the nearest net wall using horizontal thrusters."""
-        depth_error = TARGET_DEPTH - self.current_z
-        depth_cmd   = (KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION
-        depth_cmd   = max(-MAX_DEPTH_CMD, min(MAX_DEPTH_CMD, depth_cmd))
-        self._set_Fz(depth_cmd)
-        self._set_Fx(0.0)
+        depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
+        self._set_Fz(depth_cmd); self._set_Fx(0.0)
 
         yaw_error = _angle_diff(self.target_yaw, self.current_yaw)
-        pd_cmd    = (KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw)
-        mz_cmd    = max(-MAX_YAW_CMD, min(MAX_YAW_CMD, pd_cmd))
+        mz_cmd = np.clip((KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw), -MAX_YAW_CMD, MAX_YAW_CMD)
         self._set_Mz(mz_cmd)
 
-        now  = self.get_clock().now().nanoseconds * 1e-9
-
+        now = self.get_clock().now().nanoseconds * 1e-9
         if abs(yaw_error) < YAW_TOLERANCE:
             if self._yaw_ok_since is None:
                 self._yaw_ok_since = now
             elif (now - self._yaw_ok_since) >= YAW_HOLD_TIME:
-                self.get_logger().info(
-                    f"[ALIGNING → APPROACHING] Yaw error: {math.degrees(yaw_error):.2f}°")
+                self.get_logger().info(f"[ALIGNING → APPROACHING] Yaw error: {math.degrees(yaw_error):.2f}°")
                 self.state = State.APPROACHING
                 self._yaw_ok_since = None
         else:
             self._yaw_ok_since = None
 
     def _do_approaching(self):
-        """Drive forward until Sonoptix reads ≤ STANDOFF_DIST."""
-        depth_error = TARGET_DEPTH - self.current_z
-        depth_cmd   = (KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION
-        depth_cmd   = max(-MAX_DEPTH_CMD, min(MAX_DEPTH_CMD, depth_cmd))
+        depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
         self._set_Fz(depth_cmd)
 
-        # Keep heading locked to target_yaw (PD control)
         yaw_error = _angle_diff(self.target_yaw, self.current_yaw)
-        pd_cmd    = (KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw)
-        mz_cmd    = max(-MAX_YAW_CMD, min(MAX_YAW_CMD, pd_cmd))
+        mz_cmd = np.clip((KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw), -MAX_YAW_CMD, MAX_YAW_CMD)
         self._set_Mz(mz_cmd)
 
         if self.sonoptix_range is None:
-            # No sonar return yet — move forward cautiously
             self._set_Fx(MAX_SURGE_CMD * 0.3)
             return
 
-        dist_error = self.sonoptix_range - STANDOFF_DIST
-        surge_cmd  = max(0.0, min(MAX_SURGE_CMD, KP_SURGE * dist_error))
+        surge_cmd = np.clip(KP_SURGE * (self.sonoptix_range - STANDOFF_DIST), 0.0, MAX_SURGE_CMD)
         self._set_Fx(surge_cmd)
 
-        self.get_logger().info(
-            f"[APPROACHING] Sonoptix range: {self.sonoptix_range:.2f} m "
-            f"(target {STANDOFF_DIST:.1f} m, surge={surge_cmd:.1f} N)",
-            throttle_duration_sec=1.0
-        )
-
         if (self.sonoptix_range - STANDOFF_DIST) <= APPROACH_TOL:
-            self.get_logger().info(
-                f"[APPROACHING → STANDOFF] Reached {self.sonoptix_range:.2f} m standoff!")
+            self.get_logger().info(f"[APPROACHING → STANDOFF] Reached {self.sonoptix_range:.2f} m standoff!")
             self.state = State.STANDOFF
             self._define_local_origin()
 
     def _define_local_origin(self):
-        """Phase 3: Capture the current position and define the net's local origin."""
-        # The exact origin on the net wall is STANDOFF_DIST meters directly extending 
-        # from our current position along our target heading.
         origin_x = self.current_x + STANDOFF_DIST * math.cos(self.target_yaw)
         origin_y = self.current_y + STANDOFF_DIST * math.sin(self.target_yaw)
         origin_z = self.current_z 
-        
-        # We want the origin's X-axis to point outwards from the net (opposite to our heading)
-        # So X points back towards the AUV, Y points along the net wall tangentially.
         origin_yaw = self.target_yaw + math.pi
 
         self.get_logger().info(f"[PHASE 3] Defined Local Origin at: x={origin_x:.2f}, y={origin_y:.2f}, z={origin_z:.2f}, yaw={math.degrees(origin_yaw):.1f}°")
 
-        # 1. Store locally for constant broadcasting
         self._local_origin_transform = TransformStamped()
         self._local_origin_transform.header.frame_id = 'odom'
         self._local_origin_transform.child_frame_id = 'local_origin'
@@ -425,9 +275,7 @@ class Phase2MissionNode(Node):
         self._local_origin_transform.transform.translation.y = origin_y
         self._local_origin_transform.transform.translation.z = origin_z
         
-        # Quaternion for pure yaw rotation: [0, 0, sin(yaw/2), cos(yaw/2)]
-        qx = 0.0
-        qy = 0.0
+        qx, qy = 0.0, 0.0
         qz = math.sin(origin_yaw / 2.0)
         qw = math.cos(origin_yaw / 2.0)
 
@@ -436,10 +284,8 @@ class Phase2MissionNode(Node):
         self._local_origin_transform.transform.rotation.z = qz
         self._local_origin_transform.transform.rotation.w = qw
 
-        # 2. Publish as PoseStamped
         pose_msg = PoseStamped()
         pose_msg.header.frame_id = 'odom'
-        pose_msg.header.stamp = self.get_clock().now().to_msg()
         pose_msg.pose.position.x = origin_x
         pose_msg.pose.position.y = origin_y
         pose_msg.pose.position.z = origin_z
@@ -447,76 +293,58 @@ class Phase2MissionNode(Node):
         pose_msg.pose.orientation.y = qy
         pose_msg.pose.orientation.z = qz
         pose_msg.pose.orientation.w = qw
-        self.origin_pub.publish(pose_msg)
+        
+        # Sauvegarde pour publication continue
+        self._local_origin_pose = pose_msg
 
     def _do_standoff(self):
-        """Hold position at standoff; publish mission done."""
-        depth_error = TARGET_DEPTH - self.current_z
-        depth_cmd   = (KP_DEPTH * depth_error) - BUOYANCY_COMPENSATION
-        depth_cmd   = max(-MAX_DEPTH_CMD, min(MAX_DEPTH_CMD, depth_cmd))
-        self._set_Fz(depth_cmd)
+        """Hold position at standoff; purely communication phase for MPC takeover."""
+        # On ne calcule plus de commandes propulseurs ici, _publish_state les ignore de toute façon.
 
-        yaw_error = _angle_diff(self.target_yaw, self.current_yaw)
-        pd_cmd    = (KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw)
-        mz_cmd    = max(-MAX_YAW_CMD, min(MAX_YAW_CMD, pd_cmd))
-        self._set_Mz(mz_cmd)
-        self._set_Fx(0.0)
-
-        # Publish done flag every cycle (idempotent)
+        # 1. Publier la fin de la phase 2 en boucle
         done_msg = Bool()
         done_msg.data = True
         self.done_pub.publish(done_msg)
 
-        # Broadcast the fixed local origin TF continuously
+        # 2. Publier la pose de l'origine en boucle pour s'assurer que le MPC la reçoive
+        if hasattr(self, '_local_origin_pose'):
+            self._local_origin_pose.header.stamp = self.get_clock().now().to_msg()
+            self.origin_pub.publish(self._local_origin_pose)
+
+        # 3. Diffuser la transformation TF en boucle
         if hasattr(self, '_local_origin_transform'):
             self._local_origin_transform.header.stamp = self.get_clock().now().to_msg()
             self.tf_broadcaster.sendTransform(self._local_origin_transform)
 
-    def _set_Fz(self, fz: float):
-        """Set desired heave force (+ = up, − = down in body/world Z)."""
-        self._cmd_Fz = fz
-
-    def _set_Mz(self, mz: float):
-        """Set desired yaw torque (+ = CCW from above)."""
-        self._cmd_Mz = mz
-
-    def _set_Fx(self, fx: float):
-        """Set desired surge force (+ = forward)."""
-        self._cmd_Fx = fx
+    def _set_Fz(self, fz: float): self._cmd_Fz = fz
+    def _set_Mz(self, mz: float): self._cmd_Mz = mz
+    def _set_Fx(self, fx: float): self._cmd_Fx = fx
 
     def _publish_state(self):
-        """
-        Convert stored body-frame wrench [Fx, 0, Fz, 0, 0, Mz] into 8 thruster
-        forces via TAM pseudo-inverse, apply thrust_coefficient sign correction
-        (required by Gazebo’s Thruster plugin), clamp, and publish.
-        """
+        # On laisse la main au MPC une fois en STANDOFF
+        if self.state == State.STANDOFF:
+            phase_msg = String()
+            phase_msg.data = self.state
+            self.phase_pub.publish(phase_msg)
+            return
+
         Fx = getattr(self, '_cmd_Fx', 0.0)
         Fz = getattr(self, '_cmd_Fz', 0.0)
         Mz = getattr(self, '_cmd_Mz', 0.0)
 
-        tau     = np.array([Fx, 0.0, Fz, 0.0, 0.0, Mz])
-        thrusts = TAM_PINV @ tau
-        thrusts = np.clip(thrusts, -MAX_INDIVIDUAL_THRUST, MAX_INDIVIDUAL_THRUST)
+        tau = np.array([Fx, 0.0, Fz, 0.0, 0.0, Mz])
+        thrusts = np.clip(TAM_PINV @ tau, -MAX_INDIVIDUAL_THRUST, MAX_INDIVIDUAL_THRUST)
 
         for i, (thrust, coeff) in enumerate(zip(thrusts, THRUST_COEFFS)):
             msg = Float64()
-            # thrust_coefficient sign correction — required so Gazebo’s propeller
-            # spins in the correct direction for the intended force.
             msg.data = float(thrust) * math.copysign(1.0, coeff)
             self._thrust_pubs[i].publish(msg)
 
-        # Reset wrench for next cycle
-        self._cmd_Fx = 0.0
-        self._cmd_Fz = 0.0
-        self._cmd_Mz = 0.0
+        self._cmd_Fx, self._cmd_Fz, self._cmd_Mz = 0.0, 0.0, 0.0
 
-        # Publish current state name
         phase_msg = String()
         phase_msg.data = self.state
         self.phase_pub.publish(phase_msg)
-
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main(args=None):
     rclpy.init(args=args)
@@ -528,7 +356,6 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
