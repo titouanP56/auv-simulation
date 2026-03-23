@@ -33,6 +33,7 @@ YAW_HOLD_TIME     = 1.0     # [s]
 
 STANDOFF_DIST     = 1.5     # [m]
 APPROACH_TOL      = 0.10    # [m]
+STABILIZE_TIME    = 3.0     # [s]
 
 KP_DEPTH  = 12.0
 BUOYANCY_COMPENSATION = 3.0
@@ -69,6 +70,7 @@ class State:
     SCANNING    = "SCANNING"
     ALIGNING    = "ALIGNING"
     APPROACHING = "APPROACHING"
+    STABILIZING = "STABILIZING"
     STANDOFF    = "STANDOFF"
 
 
@@ -127,7 +129,7 @@ class Phase2MissionNode(Node):
             depth=1,
         )
 
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self._odom_cb, 10)
+        self.odom_sub = self.create_subscription(Odometry, '/odometry/filtered', self._odom_cb, 10)
         self.ping360_sub = self.create_subscription(LaserScan, '/ping360/scan', self._ping360_cb, best_effort_qos)
         self.sonoptix_sub = self.create_subscription(PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
 
@@ -142,6 +144,7 @@ class Phase2MissionNode(Node):
         self.current_yaw, self.current_vyaw = 0.0, 0.0
         self.target_yaw = 0.0
         self.sonoptix_range: float | None = None
+        self._stabilize_start_time: float | None = None
 
         self._depth_ok_since: float | None = None
         self._yaw_ok_since: float | None = None
@@ -175,7 +178,7 @@ class Phase2MissionNode(Node):
         self._have_scan = True
 
     def _sonoptix_cb(self, msg: PointCloud2):
-        if self.state in (State.APPROACHING, State.STANDOFF):
+        if self.state in (State.APPROACHING, State.STABILIZING, State.STANDOFF):
             self.sonoptix_range = _min_sonoptix_range(msg)
             self._have_points = True
 
@@ -193,6 +196,8 @@ class Phase2MissionNode(Node):
             self._do_aligning()
         elif self.state == State.APPROACHING:
             self._do_approaching()
+        elif self.state == State.STABILIZING:
+            self._do_stabilizing()
         elif self.state == State.STANDOFF:
             self._do_standoff()
 
@@ -256,9 +261,33 @@ class Phase2MissionNode(Node):
         self._set_Fx(surge_cmd)
 
         if (self.sonoptix_range - STANDOFF_DIST) <= APPROACH_TOL:
-            self.get_logger().info(f"[APPROACHING → STANDOFF] Reached {self.sonoptix_range:.2f} m standoff!")
-            self.state = State.STANDOFF
+            self.get_logger().info(f"[APPROACHING → STABILIZING] Reached {self.sonoptix_range:.2f} m standoff! Stabilizing...")
+            self.state = State.STABILIZING
+            self._stabilize_start_time = self.get_clock().now().nanoseconds * 1e-9
+
+    def _do_stabilizing(self):
+        # 1. Maintain Depth
+        depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
+        self._set_Fz(depth_cmd)
+
+        # 2. Maintain Yaw
+        yaw_error = _angle_diff(self.target_yaw, self.current_yaw)
+        mz_cmd = np.clip((KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw), -MAX_YAW_CMD, MAX_YAW_CMD)
+        self._set_Mz(mz_cmd)
+
+        # 3. Maintain Standoff Distance (Active Braking)
+        if self.sonoptix_range is not None:
+            surge_cmd = np.clip(KP_SURGE * (self.sonoptix_range - STANDOFF_DIST), -MAX_SURGE_CMD, MAX_SURGE_CMD)
+            self._set_Fx(surge_cmd)
+        else:
+            self._set_Fx(0.0)
+
+        # 4. Check Timer
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if self._stabilize_start_time and (now - self._stabilize_start_time) >= STABILIZE_TIME:
+            self.get_logger().info("[STABILIZING → STANDOFF] Robot stabilized. Defining local origin.")
             self._define_local_origin()
+            self.state = State.STANDOFF
 
     def _define_local_origin(self):
         origin_x = self.current_x + STANDOFF_DIST * math.cos(self.target_yaw)

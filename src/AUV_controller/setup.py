@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/phase4_net_inspection.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -30,6 +31,8 @@ setup(
             'mpc_controller_sensors = AUV_controller.mpc_controller_sensors:main',
             'mpc_controller_realistic = AUV_controller.mpc_controller_realistic:main',
             'station_keeping = AUV_controller.station_keeping:main',
+            'lawnmower_trajectory_node = AUV_controller.lawnmower_trajectory_node:main',
+            'mpc_controller_net_inspection = AUV_controller.mpc_controller_net_inspection:main',
         ],
     },
 )
