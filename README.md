@@ -12,6 +12,7 @@ The project is divided into differents packages:
 3. **`AUV_description`** (Dynamics): Contains the physical 3D model of the submarine (URDF/Xacro), its sensors, and the virtual simulation environments (Gazebo).
 4. **`my_auv_localization`** (Navigation): Fuses sensor data (IMU, DVL) using an Extended Kalman Filter (EKF) to estimate the robot's precise 3D position and orientation.
 5. **`auv_dvl_bridge`**: Hardware/Simulation interface that translates raw DVL sensor data into standard ROS 2 formats.
+6. **`auv_perception`** (Mapping): Processes sonar point clouds to generate and auto-save a real-time OctoMap 3D voxel grid representing the environment.
 
 ## Prerequisites
 
@@ -89,6 +90,14 @@ These scripts apply a constant force to test engines:
   ```bash
   ros2 run AUV_controller move_down
   ```
+
+### 4. 3D Mapping & Perception
+
+The `auv_perception` package handles 3D mapping using OctoMap. It runs the sensor data filters and the map building server independently. It automatically saves the generated map every 60 seconds (`net_map_autosave.bt`).
+To launch the mapping nodes in parallel with your simulation:
+```bash
+ros2 launch auv_perception mapping.launch.py
+```
 
 ## Troubleshooting
 
