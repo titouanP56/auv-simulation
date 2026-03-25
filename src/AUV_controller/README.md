@@ -2,7 +2,7 @@
 
 This package contains the control and navigation algorithms for the AUV developed in the ROS 2 environment.
 
-It implements controllers ranging from Station Keeping using PID to Model Predictive Control (MPC) to reach a waypoint.
+It implements controllers ranging from Station Keeping using PID to Model Predictive Control (MPC) to track dynamic trajectories.
 
 ## Main Features
 
@@ -12,10 +12,11 @@ It implements controllers ranging from Station Keeping using PID to Model Predic
 
 ## Main Nodes and Scripts
 
-The package is structured to offer several levels of control:
+The package is structured to offer several control strategies:
 
-### 1. Advanced Controllers (Navigation)
-- **`mpc_controller_sensors.py`**: Main MPC controller designed to work with the robot's sensors. Subscribes to `/odometry/filtered` and calculates optimal thruster commands.
+### 1. Advanced Controllers (Tracking Targets)
+- **`mpc_controller_net_inspection.py`**: Heavily tuned MPC designed specifically for smooth, constant-distance inspection along a wall/net.
+- **`mpc_controller_sensors.py`**: Standard MPC designed to work with the robot's sensors. Subscribes to `/odometry/filtered` and calculates optimal thruster commands to reach the target.
 - **`station_keeping.py`**: Robust and fast PID controller to maintain the AUV at a stable `(x, y, z, yaw)` position.
 - **`mpc_controller_blueROV.py`**: Theoretical version of the MPC, subscribing directly to exact ground truth `/odom`.
 

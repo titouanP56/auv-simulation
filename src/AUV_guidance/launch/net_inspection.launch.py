@@ -24,7 +24,7 @@ def generate_launch_description():
 
     # 2. Trajectory Generator Node
     trajectory_node = Node(
-        package='AUV_controller',
+        package='AUV_guidance',
         executable='lawnmower_trajectory_node',
         name='lawnmower_trajectory_node',
         output='screen',

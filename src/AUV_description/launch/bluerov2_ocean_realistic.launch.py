@@ -225,20 +225,19 @@ def generate_launch_description():
         value=[os.path.join(get_package_share_directory('AUV_description'), '..')]
     )
 
-    # 7. Phase 2 Mission Node (delayed: wait for Gazebo + EKF to be ready)
-    phase2_mission = TimerAction(
+    # 7. Net Approach Node (delayed: wait for Gazebo + EKF to be ready)
+    net_approach = TimerAction(
         period=5.0,  # [s] give Gazebo, bridge, and EKF time to start
         actions=[
             Node(
-                package='AUV_mission_control',
-                executable='phase2_mission',
-                name='phase2_mission',
+                package='AUV_guidance',
+                executable='net_approach',
+                name='net_approach',
                 output='screen',
                 parameters=[{'use_sim_time': True}],
             )
         ]
     )
-
 
     return LaunchDescription([
         gz_resource_path,
@@ -253,5 +252,5 @@ def generate_launch_description():
         ping360_tf,
         imu_tf,
         sonoptix_tf,
-        phase2_mission,   # Phase 2: delayed start
+        net_approach,   # Net approach: delayed start
     ])

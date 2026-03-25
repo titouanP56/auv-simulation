@@ -5,27 +5,28 @@ Welcome to the ROS 2 AUV (Autonomous Underwater Vehicle) project! This workspace
 
 ## Project Overview
 
-The project is divided into 4 main parts (called "packages"):
+The project is divided into differents packages:
 
-1. **`AUV_description`**: Contains the 3D model of the submarine, its sensors (cameras, sonar, etc.), and the virtual 3D pool where it swims (using the Gazebo simulator).
-2. **`AUV_controller`**: The "brain" of the robot. It contains algorithms to make the robot move and stay in place (using methods like Station Keeping with PID control and Model Predictive Control - MPC).
-3. **`my_auv_localization`**: Helps the robot figure out exactly where it is in the water by combining data from its sensors (like the IMU for rotation and DVL for speed).
-4. **`auv_dvl_bridge`**: A translator that takes raw sensor data (from the DVL) and converts it into a format the robot's brain can understand.
+1. **`AUV_guidance`** (Guidance): The high-level decision maker. Generates trajectories (e.g., Lawnmower patterns) and manages mission state transitions (e.g., Phase 2 approach).
+2. **`AUV_controller`** (Control): The low-level execution layer. Calculates the physical forces needed to follow the guidance instructions using Model Predictive Control (MPC) or PID Station Keeping.
+3. **`AUV_description`** (Dynamics): Contains the physical 3D model of the submarine (URDF/Xacro), its sensors, and the virtual simulation environments (Gazebo).
+4. **`my_auv_localization`** (Navigation): Fuses sensor data (IMU, DVL) using an Extended Kalman Filter (EKF) to estimate the robot's precise 3D position and orientation.
+5. **`auv_dvl_bridge`**: Hardware/Simulation interface that translates raw DVL sensor data into standard ROS 2 formats.
 
 ## Prerequisites
 
 Before starting, ensure you have:
 - A Linux computer (Ubuntu is recommended).
-- **ROS 2** installed (e.g., Foxy).
+- **ROS 2** installed (e.g., Jazzy).
 - **Gazebo** installed (the 3D simulation software).
 
 ## How to Use the Project
 
-Follow these steps to launch the simulation and make the robot move.
+Follow these steps to launch the simulation and make the robot move or execute missions.
 
 ### 1. Build the Workspace
 
-First, we need to compile the code so the computer can run it. Open a terminal and run the following commands:
+First, compile the code so the system can run it. Open a terminal and run the following commands:
 
 ```bash
 # Go to the project folder
@@ -34,71 +35,52 @@ cd ~/AUV_project/ros2_AUV
 # Compile the code
 colcon build
 
-# Tell your terminal where to find the newly compiled programs
+# Source the newly compiled programs
 source install/setup.bash
 ```
 
-*Note: You only need to run `colcon build` if you have changed the code. But you **always** need to run `source install/setup.bash` every time you open a new terminal.*
+*Note: You must run `source install/setup.bash` every time you open a new terminal.*
 
 ### 2. Launch the 3D Simulation
 
-Now, let's start the virtual pool and put the robot inside it. In the same terminal, run:
+Start the virtual environment and spawn the robot. In the same terminal, run:
 
-- **Realistic Simulation** :
+- **Phase 4 Net Inspection (Full Integration)**:
+  Launches the realistic ocean environment, the robot with all sensors, and delays the start of the Guidance and Control modules to inspect a net.
   ```bash
-  ros2 launch AUV_description bluerov2_realist_bassin.launch.py
-  ```
-- **Equipped with sensors** (classic):
-  ```bash
-  ros2 launch AUV_description bluerov2_bassin_captors.launch.py
-  ```
-- **Basic model** (no sensors):
-  ```bash
-  ros2 launch AUV_description bluerov2_bassin.launch.py
-  ```
-- **Realistic Simulation with waves** :
-  ```bash
-  ros2 launch AUV_description bluerov2_bassin_waves.launch.py
-  ```
-- **Deep Ocean Simulation** (40m depth + Net):
-  ```bash
-  ros2 launch AUV_description bluerov2_ocean_realistic.launch.py
+  ros2 launch AUV_guidance net_inspection.launch.py
   ```
 
-Wait a few moments. A new window (Gazebo) will open showing a 3D pool with the BlueROV2 submarine floating inside. The robot's sensors are now active and gathering data.
+Alternatively, you can launch standalone simulation environments (useful for manual testing):
+- **Equipped with sensors in a basin**: `ros2 launch AUV_description bluerov2_bassin_captors.launch.py`
+- **Realistic AUV in the bassin**: `ros2 launch AUV_description bluerov2_realist_bassin.launch.py`
 
-### 3. Start the Controller (Make the robot move)
+### 3. Start the Guidance or Controllers manually
 
-Right now, the robot is just floating. We need to give it a brain so it can maintain its position or move to a specific point.
+If you didn't launch the full `phase4` integrated mission, you can start the components manually in a **new, sourced terminal**.
 
-Open a **new, second terminal** and run:
+**1. Guidance (Missions & Trajectories) (Not recommanded):**
+- **Phase 2 Mission (Approach & Standoff)**:
+  ```bash
+  ros2 run AUV_guidance net_approach
+  ```
+- **Lawnmower Trajectory**:
+  ```bash
+  ros2 run AUV_guidance lawnmower_trajectory_node
+  ```
 
-```bash
-# Go to the project folder again
-cd ~/AUV_project/ros2_AUV
-
-# Source the configuration again (required for every new terminal)
-source install/setup.bash
-```
-
-Here is the list of scripts you can launch to move the robot:
-
-**1. Advanced Navigation Controllers:**
+**2. Control Algorithms:**
+- **MPC with Sensors**: Standard MPC using real sensor data (EKF odometry).
+  ```bash
+  ros2 run AUV_controller mpc_controller_sensors
+  ```
 - **Station Keeping**: Makes the robot hold its current position.
   ```bash
   ros2 run AUV_controller station_keeping
   ```
-- **MPC with Sensors**: Standard MPC using real sensor data (EKF odometry) to navigate.
-  ```bash
-  ros2 run AUV_controller mpc_controller_sensors
-  ```
-- **MPC with Exact Simulation Data**: Theoretical MPC subscribing directly to Gazebo's perfect odometry.
-  ```bash
-  ros2 run AUV_controller mpc_controller_bluerov
-  ```
 
-**2. Basic Open-Loop Movement (Testing):**
-These scripts apply a constant force to test engines or validate physics:
+**3. Basic Open-Loop Movement (Hardware Testing):**
+These scripts apply a constant force to test engines:
 - **Move Forward**:
   ```bash
   ros2 run AUV_controller move_forward
