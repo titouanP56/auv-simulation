@@ -171,8 +171,8 @@ class WallFollower:
     def __init__(
         self,
         target_distance: float = 1.5,
-        robot_half_length: float = 0.23,
-        robot_half_width: float = 0.20,
+        robot_half_length: float = 0.46/2,
+        robot_half_width: float = 0.38/2,
     ):
         self.target_distance = target_distance
         self.L = robot_half_length
@@ -327,6 +327,9 @@ class WallFollowingNode(Node):
         self.prev_bearing = None
         self.start_transition_time = None
 
+        # Last detected wall point in global (Odom) frame for latency compensation
+        self.last_wall_point_global = None # (x, y)
+
         # ── QoS ───────────────────────────────────────────────────────────────
         best_effort_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -467,109 +470,118 @@ class WallFollowingNode(Node):
         # Refresh configurable parameters
         self._load_parameters()
 
-        # Robot position in Odom frame
+        # ── 0. Robot position in Odom frame ──────────────────────────────
         x_g = self.current_pose.position.x
         y_g = self.current_pose.position.y
         psi_0 = self.origin_pose[3]
 
-        # ── Attempt Hough perception ─────────────────────────────────────────
-        use_perception = False
-        wall_dist = 0.0
-        wall_angle = 0.0
+        # ── 1. Update Navigation State (Nose-to-Net) ──────────────────
+        # Yaw points strictly towards the net (outward from center)
+        target_yaw_g = math.atan2(
+            y_g - self.circle_center_y, 
+            x_g - self.circle_center_x
+        )
 
+        # ── 2. Perception & Latency Compensation ──────────────────────────
+        # We integrate DVL/Gyro between sonar scans by persisting the wall point in Odom.
+        wall_dist = None
+        wall_angle = None
+        
+        # Try new scan
         now = self.get_clock().now()
-        if self.last_scan_time is not None and self.latest_scan is not None:
+        if self.latest_scan is not None:
             dt_scan = (now - self.last_scan_time).nanoseconds / 1e9
             if dt_scan < 3.0:
                 result = self.wall_extractor.extract(self.latest_scan)
                 if result is not None:
-                    wall_dist, wall_angle, xs, ys = result
-                    use_perception = True
-
-                    # Feed wall points into spline generator (global frame)
+                    wdist, wangle, _, _ = result
+                    # Store wall point in global (Odom) frame
                     cos_yaw = math.cos(self.current_yaw)
                     sin_yaw = math.sin(self.current_yaw)
-                    # Closest wall point in body frame → rotate to global
-                    wp_body_x = wall_dist * math.cos(wall_angle)
-                    wp_body_y = wall_dist * math.sin(wall_angle)
-                    wp_global_x = x_g + wp_body_x * cos_yaw - wp_body_y * sin_yaw
-                    wp_global_y = y_g + wp_body_x * sin_yaw + wp_body_y * cos_yaw
-                    self.trajectory_gen.add_wall_point(wp_global_x, wp_global_y)
+                    wp_body_x = wdist * math.cos(wangle)
+                    wp_body_y = wdist * math.sin(wangle)
+                    w_glob_x = x_g + wp_body_x * cos_yaw - wp_body_y * sin_yaw
+                    w_glob_y = y_g + wp_body_x * sin_yaw + wp_body_y * cos_yaw
+                    self.last_wall_point_global = (w_glob_x, w_glob_y)
+                    self.trajectory_gen.add_wall_point(w_glob_x, w_glob_y)
 
-        # ── Compute velocity vector ──────────────────────────────────────────
-        # Radial direction from cage centre
+        # Compute current relative errors using last known wall point
+        if self.last_wall_point_global is not None:
+            wg_x, wg_y = self.last_wall_point_global
+            # Vector from robot to wall point
+            dx_w = wg_x - x_g
+            dy_w = wg_y - y_g
+            # Distance and angle in global
+            dist_w = math.hypot(dx_w, dy_w)
+            angle_w_g = math.atan2(dy_w, dx_w)
+            # Wall angle relative to robot nose
+            wall_angle = angle_wrap(angle_w_g - self.current_yaw)
+            wall_dist = dist_w
+
+        # ── 3. Velocity Decomposition (Strafing) ─────────────────────────
+        # Radial unit vector (from center to robot)
         om_x = x_g - self.circle_center_x
         om_y = y_g - self.circle_center_y
         dist_to_center = math.hypot(om_x, om_y)
-        if dist_to_center < 0.1:
-            dist_to_center = 0.1
-        u_om_x = om_x / dist_to_center
-        u_om_y = om_y / dist_to_center
+        u_om_x = om_x / max(0.1, dist_to_center)
+        u_om_y = om_y / max(0.1, dist_to_center)
 
-        # Tangent vector (CCW orbit — robot inside looking outward)
+        # Tangent unit vector (CCW orbit)
         v_t_x = -u_om_y
         v_t_y = u_om_x
 
-        if use_perception:
-            # --- Chou et al. metrics ---
-            e_d, e_theta, d_f, d_b = self.wall_follower.compute_errors(
-                wall_dist, wall_angle
-            )
-            # Normal correction: global frame via wall_angle + robot yaw
-            normal_global = self.current_yaw + wall_angle
-            v_n_x = self.gain_distance * e_d * math.cos(normal_global)
-            v_n_y = self.gain_distance * e_d * math.sin(normal_global)
-
-            # Angular correction applied as yaw offset
-            target_yaw_g = self.current_yaw + wall_angle + math.pi / 2.0
-            # Add angular correction
-            target_yaw_g += self.gain_angle * e_theta
-
-            # B-Spline waypoint (if available, override tangential direction)
-            spline_wp = self.trajectory_gen.generate_waypoint()
-            if spline_wp is not None:
-                sp_x, sp_y = spline_wp
-                dx_sp = sp_x - x_g
-                dy_sp = sp_y - y_g
-                sp_dist = math.hypot(dx_sp, dy_sp)
-                if sp_dist > 0.01:
-                    v_t_x = dx_sp / sp_dist
-                    v_t_y = dy_sp / sp_dist
+        # Calculate Results
+        if wall_dist is not None:
+            # Distance error (current dist - target)
+            # Robot is inside cage, target_distance is from net towards center.
+            # R_current is dist_to_center. Total radius is net_radius.
+            # Standoff = net_radius - dist_to_center.
+            # Perception-based error:
+            e_d, e_theta, d_f, d_b = self.wall_follower.compute_errors(wall_dist, wall_angle)
+            
+            # Radial Velocity (Correction - Surge if nose to center)
+            v_radial_mag = self.gain_distance * e_d
+            v_n_x = v_radial_mag * u_om_x
+            v_n_y = v_radial_mag * u_om_y
+            
+            # Tangential Velocity (Progression - Sway if nose to center)
+            # If d_f != d_b, we can add a small tangential component to realign
+            v_tangent_mag = self.nominal_velocity
+            v_res_x = v_tangent_mag * v_t_x + v_n_x
+            v_res_y = v_tangent_mag * v_t_y + v_n_y
         else:
-            # --- Fallback: geometric circle tracking ---
+            # Fallback: Geometric circle tracking
             tracking_radius = self.net_radius - self.target_distance
             error = dist_to_center - tracking_radius
-            v_n_x = -error * u_om_x
-            v_n_y = -error * u_om_y
-            # Face outward (toward the net)
-            target_yaw_g = math.atan2(u_om_y, u_om_x)
+            v_n_x = -error * self.gain_distance * u_om_x
+            v_n_y = -error * self.gain_distance * u_om_y
+            v_res_x = self.nominal_velocity * v_t_x + v_n_x
+            v_res_y = self.nominal_velocity * v_t_y + v_n_y
 
-        # Resultant velocity vector in odom
-        v_res_x = v_t_x + self.gain_distance * v_n_x
-        v_res_y = v_t_y + self.gain_distance * v_n_y
+        # Normalize total velocity to nominal_velocity
         norm_res = math.hypot(v_res_x, v_res_y)
         if norm_res > 0.001:
             v_res_x = (v_res_x / norm_res) * self.nominal_velocity
             v_res_y = (v_res_y / norm_res) * self.nominal_velocity
 
-        # Look-ahead target in odom
+        # ── 4. Target Generation (Look-ahead) ───────────────────────────
         target_g_x = x_g + v_res_x * self.lookahead_time
         target_g_y = y_g + v_res_y * self.lookahead_time
 
-        # ── Transform to local frame ─────────────────────────────────────────
+        # ── 5. Transform to local frame ──────────────────────────────────
         tdx = target_g_x - self.origin_pose[0]
         tdy = target_g_y - self.origin_pose[1]
         target_x_L = tdx * math.cos(psi_0) + tdy * math.sin(psi_0)
         target_y_L = -tdx * math.sin(psi_0) + tdy * math.cos(psi_0)
-        target_yaw_L = target_yaw_g - psi_0
+        target_yaw_L = angle_wrap(target_yaw_g - psi_0)
 
-        # ── Soft start (1 second ramp) ────────────────────────────────────────
+        # Soft start
         elapsed = (now - self.start_transition_time).nanoseconds / 1e9
         if elapsed < 1.0:
             target_x_L *= elapsed
             target_y_L *= elapsed
 
-        # ── Publish PoseStamped for MPC ──────────────────────────────────────
+        # Publish PoseStamped
         msg = PoseStamped()
         msg.header.stamp = now.to_msg()
         msg.header.frame_id = 'local_origin'

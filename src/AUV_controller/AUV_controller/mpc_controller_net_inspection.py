@@ -234,16 +234,16 @@ class MPCControllerNetInspection(Node):
         # 1. ORIENTATION (Priorité absolue)
         # Poids gigantesque sur le maintien du cap. Le ROV préférera être légèrement 
         # en retard sur sa trajectoire plutôt que de détourner le regard du filet.
-        yaw_err = 2000.0 * (1 - ca.cos(psi - psi_ref))
+        yaw_err = 5000.0 * (1 - ca.cos(psi - psi_ref))
         
         # 2. POSITION (Suivi de trajectoire)
         # On augmente les poids de position pour qu'il suive bien le chemin.
         # Z (profondeur) a un poids un peu plus fort car la dynamique verticale 
         # combat la flottabilité.
         mterm = (
-            100.0 * (x - x_ref)**2 +  # Distance au filet (X)
-            100.0 * (y - y_ref)**2 +  # Décalage latéral (Y - très important pour le scan)
-            150.0 * (z - z_ref)**2 +  # Profondeur (Z - descente/remontée)
+            200.0 * (x - x_ref)**2 +  # Distance au filet (X)
+            200.0 * (y - y_ref)**2 +  # Décalage latéral (Y - très important pour le scan)
+            200.0 * (z - z_ref)**2 +  # Profondeur (Z - descente/remontée)
             yaw_err                   # Orientation (Psi)
         )
         
@@ -251,7 +251,7 @@ class MPCControllerNetInspection(Node):
         # On pénalise très fortement 'r_val' (la vitesse de rotation) : on lui interdit de pivoter.
         # On garde une toute petite pénalité d'énergie (u_vec_cost) pour éviter que les moteurs 
         # ne saturent inutilement, mais assez faible pour qu'il ait la force de bouger.
-        lterm = mterm + 400.0 * r_val**2 + 0.005 * (ca.sumsqr(u_vec_cost))
+        lterm = mterm + 1000.0 * r_val**2 + 0.005 * (ca.sumsqr(u_vec_cost))
         
         self.mpc.set_objective(mterm=mterm, lterm=lterm)
 
