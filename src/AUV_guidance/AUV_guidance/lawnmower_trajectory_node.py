@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool
@@ -10,6 +12,10 @@ import numpy as np
 class LawnmowerTrajectoryNode(Node):
     def __init__(self):
         super().__init__('lawnmower_trajectory_node')
+
+        # Parameters
+        self.declare_parameter('enabled', True)
+        self.enabled = self.get_parameter('enabled').value
 
         # State
         self.phase2_done = False
@@ -76,9 +82,10 @@ class LawnmowerTrajectoryNode(Node):
     def phase2_done_callback(self, msg):
         if msg.data and not self.phase2_done:
             self.phase2_done = True
-            self.state = "SWEEP_RIGHT"
-            self.last_time = self.get_clock().now()
-            self.get_logger().info("Phase 2 done signal received. Starting Lawnmower (SWEEP_RIGHT).")
+            if self.enabled:
+                self.state = "SWEEP_RIGHT"
+                self.last_time = self.get_clock().now()
+                self.get_logger().info("Phase 2 done signal received. Starting Lawnmower (SWEEP_RIGHT).")
 
     def origin_callback(self, msg):
         pass

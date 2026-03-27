@@ -28,6 +28,8 @@ setup(
         'console_scripts': [
             'net_approach = AUV_guidance.net_approach:main',
             'lawnmower_trajectory_node = AUV_guidance.lawnmower_trajectory_node:main',
+            'reactive_wall_follower = AUV_guidance.reactive_wall_follower:main',
+            'wall_following_node = AUV_guidance.wall_following_node:main',
         ],
     },
 )

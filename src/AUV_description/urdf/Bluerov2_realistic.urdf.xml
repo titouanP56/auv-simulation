@@ -3,7 +3,7 @@
 
     <xacro:property name="body_length" value="0.46" />
     <xacro:property name="body_width" value="0.38" />
-    <xacro:property name="body_height" value="0.58" />
+    <xacro:property name="body_height" value="0.245" />
 
     <xacro:property name="mass" value="12.5"/> 
 
@@ -21,7 +21,7 @@
 
     <link name="base_link">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 -0.0225" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://AUV_description/meshes/bluerov2/bluerov2_heavy.dae" scale="1 1 1"/>
             </geometry>

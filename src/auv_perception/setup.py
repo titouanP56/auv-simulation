@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'sonar_filter_node = auv_perception.sonar_filter_node:main',
             'auto_saver_node = auv_perception.auto_saver_node:main',
+            'net_local_estimator = auv_perception.net_local_estimator:main',
         ],
     },
 )
