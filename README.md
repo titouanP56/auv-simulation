@@ -7,7 +7,7 @@ Welcome to the ROS 2 AUV (Autonomous Underwater Vehicle) project! This workspace
 
 The project is divided into differents packages:
 
-1. **`AUV_guidance`** (Guidance): The high-level decision maker. Generates trajectories (e.g., Lawnmower patterns) and manages mission state transitions (e.g., Phase 2 approach).
+1. **`AUV_guidance`** (Guidance): The high-level decision maker. Generates trajectories and manages mission state transitions.
 2. **`AUV_controller`** (Control): The low-level execution layer. Calculates the physical forces needed to follow the guidance instructions using Model Predictive Control (MPC) or PID Station Keeping.
 3. **`AUV_description`** (Dynamics): Contains the physical 3D model of the submarine (URDF/Xacro), its sensors, and the virtual simulation environments (Gazebo).
 4. **`my_auv_localization`** (Navigation): Fuses sensor data (IMU, DVL) using an Extended Kalman Filter (EKF) to estimate the robot's precise 3D position and orientation.
@@ -46,10 +46,10 @@ source install/setup.bash
 
 Start the virtual environment and spawn the robot. In the same terminal, run:
 
-- **Phase 4 Net Inspection (Full Integration)**:
-  Launches the realistic ocean environment, the robot with all sensors, and delays the start of the Guidance and Control modules to inspect a net.
+- **Full Mission (Approach + Cyclic Inspection)**:
+  Launches the realistic world, robot, EKF, and the sequenced phase of approach and phase of inspection.
   ```bash
-  ros2 launch AUV_guidance net_inspection.launch.py
+  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
   ```
 
 Alternatively, you can launch standalone simulation environments (useful for manual testing):
@@ -58,16 +58,16 @@ Alternatively, you can launch standalone simulation environments (useful for man
 
 ### 3. Start the Guidance or Controllers manually
 
-If you didn't launch the full `phase4` integrated mission, you can start the components manually in a **new, sourced terminal**.
+If you didn't launch the full inspection mission, you can start the components manually in a **new, sourced terminal**.
 
 **1. Guidance (Missions & Trajectories) (Not recommanded):**
-- **Phase 2 Mission (Approach & Standoff)**:
+- **Approach & Standoff**:
   ```bash
   ros2 run AUV_guidance net_approach
   ```
-- **Lawnmower Trajectory**:
+- **Inspection in circle**:
   ```bash
-  ros2 run AUV_guidance lawnmower_trajectory_node
+  ros2 run AUV_guidance phase3_inspection
   ```
 
 **2. Control Algorithms:**

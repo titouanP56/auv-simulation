@@ -95,6 +95,9 @@ LOST_WALL_TIMEOUT     = 2.0             # Temps avant de déclarer le mur "perdu
 LOST_WALL_GRACE_S     = 2.0             # Délai de grâce au lancement
 RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter le tour (yaw)
 
+DEPTH_STEP            = 2.0             # Incrément de profondeur pour chaque palier
+FINAL_DEPTH_LIMIT     = -6.0            # Profondeur finale d'arrêt de la mission
+
 # ── Thruster allocation (identical to net_approach.py) ────────────────────────
 
 THRUST_COEFFS = [-0.002, 0.002, 0.002, -0.002, -0.002, 0.002, 0.002, -0.002]
@@ -303,6 +306,8 @@ class Phase3InspectionNode(Node):
         self.current_yaw = 0.0
         self.current_vyaw = 0.0
         self.current_vy  = 0.0    # lateral sway velocity (body y)
+
+        self.target_depth = TARGET_DEPTH  # Set initial depth target
 
         # Sonar
         self._raw_net_range: float | None = None   # latest raw estimate this cycle
@@ -513,14 +518,23 @@ class Phase3InspectionNode(Node):
         if (elapsed_since_start > LAP_START_DELAY
                 and abs(self._accumulated_yaw) >= LAP_YAW_THRESHOLD):
             self.get_logger().info(
-                f"[LAP_COMPLETED] Full orbit done! "
+                f"[LAP_COMPLETED] Full orbit done at depth {self.target_depth}! "
                 f"Accumulated yaw: {math.degrees(self._accumulated_yaw):.1f}°"
             )
-            self.state = State.LAP_COMPLETED
-            self._publish_thrusters(0.0, 0.0, 0.0, 0.0)
-            done_msg = Bool()
-            done_msg.data = True
-            self.phase3_done_pub.publish(done_msg)
+            
+            # Check if we can descend to a new plateau
+            if self.target_depth - DEPTH_STEP + 0.01 >= FINAL_DEPTH_LIMIT:
+                # Adding +0.01 margin to avoid floating point issues (e.g. -2.0 - 4.0 = -6.0 >= -6.0)
+                self.target_depth -= DEPTH_STEP
+                self._accumulated_yaw = 0.0
+                self._lap_start_time = now # reset delay to avoid immediate re-trigger
+                self.get_logger().info(f"[DESCENDING] New target depth: {self.target_depth}")
+            else:
+                self.state = State.LAP_COMPLETED
+                self._publish_thrusters(0.0, 0.0, 0.0, 0.0)
+                done_msg = Bool()
+                done_msg.data = True
+                self.phase3_done_pub.publish(done_msg)
 
     # ── Walking state ─────────────────────────────────────────────────────────
 
@@ -529,7 +543,7 @@ class Phase3InspectionNode(Node):
         Calcul des commandes pour l'inspection frontale.
         """
         # 1. Profondeur (Fz)
-        depth_error = TARGET_DEPTH - self.current_z
+        depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 
@@ -542,9 +556,19 @@ class Phase3InspectionNode(Node):
             Fx = self._last_fx
 
         # 3. Vitesse de progression (Fy - Sway) : Objectif 0.2 m/s
-        target_vy = float(ORBIT_DIRECTION * 0.2)
-        vy_error = target_vy - self.current_vy
-        Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
+        # On ne bouge latéralement que si la profondeur est atteinte (marge de 15cm)
+        if abs(depth_error) < 0.15:
+            target_vy = float(ORBIT_DIRECTION * 0.2)
+            vy_error = target_vy - self.current_vy
+            Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
+        else:
+            # On descend sans progresser autour du filet, pour ne pas dévier de la trajectoire idéale
+            sway_vel_error = 0.0 - self.current_vy
+            Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
+            
+            # On empêche de compter ce tour en réinitialisant le délai
+            # (Pour utiliser l'horloge de façon propre on peut stocker le temps mais "reset" le yaw)
+            self._accumulated_yaw = 0.0
 
         # 4. Perpendicularité (Mz - Yaw) : S'aligner sur l'angle des points les plus proches
         # net_angle_error est maintenant l'angle moyen des points proches uniquement
@@ -561,7 +585,7 @@ class Phase3InspectionNode(Node):
         En cas de perte du filet : on arrête la progression latérale et on pivote
         doucement pour retrouver la paroi avec le sonar frontal.
         """
-        depth_error = TARGET_DEPTH - self.current_z
+        depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 

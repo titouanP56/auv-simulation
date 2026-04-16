@@ -12,10 +12,10 @@ This package acts as the **Guidance** module in the `ros2_AUV` workspace. It is 
 
 ### Guidance Nodes
 - **`net_approach.py`**: A state machine designed to bring the AUV from the surface down to a specific depth, scan for an underwater wall (or net) using the Ping360 sonar, approach it using Sonoptix data, and establish a standoff distance to define a new local origin.
-- **`lawnmower_trajectory_node.py`**: Generates a classic "lawnmower" (zigzag) sweeping trajectory relative to a predefined local origin. It continuously publishes waypoints intended for the MPC.
+- **`phase3_inspection.py`**: A reactive wall-following node that integrates Sonoptix point clouds for surface perpendicularity and distance regulation. Supports cyclic multi-level depth inspection (e.g., -2m, -4m, -6m steps).
 
 ### Launch Files
-- **`net_inspection.launch.py`**: A comprehensive bring-up script. It launches the Gazebo simulation environment (Dynamics), the robot state publisher, the EKF (Navigation), the trajectory generator (Guidance), and the MPC (Control), effectively starting the entire Phase 4 inspection mission.
+- **`net_full_inspection.launch.py`**: The primary mission bring-up script. Orchestrates the approach and the cyclic reactive inspection sequentially in the `small_net.xml` environment.
 
 ## Dependencies
 
@@ -24,10 +24,10 @@ This package acts as the **Guidance** module in the `ros2_AUV` workspace. It is 
 
 ## Usage
 
-**1. Launch the full Phase 4 Integration:**
-This will start Gazebo, spawn the robot, start the estimators, wait for them to stabilize, and then launch both the guidance trajectory and the MPC.
+**1. Launch the Full Cyclic Mission (Recommended):**
+Sequentially executes approach and multi-level reactive inspection.
 ```bash
-ros2 launch AUV_guidance net_inspection.launch.py
+ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
 ```
 
 **2. Run Individual Nodes (Requires active simulation) (not recommanded):**
@@ -35,5 +35,5 @@ ros2 launch AUV_guidance net_inspection.launch.py
 ros2 run AUV_guidance net_approach
 ```
 ```bash
-ros2 run AUV_guidance lawnmower_trajectory_node
+ros2 run AUV_guidance phase3_inspection
 ```
