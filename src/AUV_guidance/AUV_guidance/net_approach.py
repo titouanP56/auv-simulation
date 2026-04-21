@@ -13,7 +13,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
@@ -25,7 +25,7 @@ from tf2_ros import TransformBroadcaster
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 TARGET_DEPTH      = -2.0    # [m]
-DEPTH_TOLERANCE   = 0.20    # [m]
+DEPTH_TOLERANCE   = 0.3    # [m]
 DEPTH_HOLD_TIME   = 2.0     # [s]
 
 YAW_TOLERANCE     = math.radians(8.0)
@@ -35,13 +35,13 @@ STANDOFF_DIST     = 1.5     # [m]
 APPROACH_TOL      = 0.10    # [m]
 STABILIZE_TIME    = 3.0     # [s]
 
-KP_DEPTH  = 15.0
-BUOYANCY_COMPENSATION = 3.0
+KP_DEPTH  = 150.0
+BUOYANCY_COMPENSATION = -10.0
 KP_YAW    = 5.0
 KD_YAW    = 2.0
 KP_SURGE  = 6.0
 
-MAX_DEPTH_CMD   = 20.0
+MAX_DEPTH_CMD   = 120.0
 MAX_YAW_CMD     = 40.0
 MAX_SURGE_CMD   = 25.0
 
@@ -63,7 +63,7 @@ TAM = np.array([
     [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
 ])
 TAM_PINV = np.linalg.pinv(TAM)
-MAX_INDIVIDUAL_THRUST = 20.0
+MAX_INDIVIDUAL_THRUST = 40.0
 
 class State:
     DESCENDING  = "DESCENDING"
@@ -134,12 +134,22 @@ class Phase2MissionNode(Node):
         self.sonoptix_sub = self.create_subscription(PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
 
         self._thrust_pubs = [self.create_publisher(Float64, f'/cmd_vel_{i}', 10) for i in range(1, 9)]
+        # Changed to VOLATILE so tools like Foxglove and ros2 topic pub can trigger it reliably
+        latching_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         self.phase_pub   = self.create_publisher(String, '/mission/phase', 10)
-        self.done_pub    = self.create_publisher(Bool, '/mission/phase2_done', 10)
-        self.origin_pub  = self.create_publisher(PoseStamped, '/mission/local_origin', 10)
+        self.done_pub    = self.create_publisher(Bool, '/mission/phase2_done', latching_qos)
+        self.origin_pub  = self.create_publisher(PoseStamped, '/mission/local_origin', latching_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         self.state: str = State.DESCENDING
+        # Publish initial state immediately
+        self._publish_done_status()
         self.current_x, self.current_y, self.current_z = 0.0, 0.0, 0.0
         self.current_yaw, self.current_vyaw = 0.0, 0.0
         self.target_yaw = 0.0
@@ -187,6 +197,7 @@ class Phase2MissionNode(Node):
             return
 
         self._publish_state()
+        self._publish_done_status()
 
         if self.state == State.DESCENDING:
             self._do_descending()
@@ -326,14 +337,16 @@ class Phase2MissionNode(Node):
         # Sauvegarde pour publication continue
         self._local_origin_pose = pose_msg
 
+    def _publish_done_status(self):
+        """Publishes whether Phase 2 is complete."""
+        done_msg = Bool()
+        done_msg.data = (self.state == State.STANDOFF)
+        self.done_pub.publish(done_msg)
+
     def _do_standoff(self):
         """Hold position at standoff; purely communication phase for MPC takeover."""
-        # On ne calcule plus de commandes propulseurs ici, _publish_state les ignore de toute façon.
+        # Note: _publish_done_status() now handles the 'done' publication in the main loop.
 
-        # 1. Publier la fin de la phase 2 en boucle
-        done_msg = Bool()
-        done_msg.data = True
-        self.done_pub.publish(done_msg)
 
         # 2. Publier la pose de l'origine en boucle pour s'assurer que le MPC la reçoive
         if hasattr(self, '_local_origin_pose'):

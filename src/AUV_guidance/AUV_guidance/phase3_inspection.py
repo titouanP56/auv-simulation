@@ -39,7 +39,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
@@ -54,10 +54,10 @@ STANDOFF_DIST         = 1.5
 CONTROL_RATE_HZ       = 20.0   
 
 # Gains optimisés pour la stabilité et la réactivité
-KP_DEPTH              = 15.0
-KI_DEPTH              = 0.05
-KD_DEPTH              = 1.0
-BUOYANCY_COMP         = 3.0    
+KP_DEPTH              = 150.0
+KI_DEPTH              = 10.0
+KD_DEPTH              = 50.0
+BUOYANCY_COMP         = -10.0    
 
 # PID Distance (Fx - Surge) : Maintient le robot à 1.5m
 KP_DIST               = 12.0
@@ -74,10 +74,10 @@ KP_YAW                = 10.0
 KI_YAW                = 0.02
 KD_YAW                = 3.0  # Damping augmenté pour éviter les oscillations
 
-MAX_DEPTH_CMD         = 20.0   
+MAX_DEPTH_CMD         = 120.0   
 MAX_DIST_CMD          = 15.0   
 MAX_YAW_CMD           = 20.0   
-MAX_INDIVIDUAL_THRUST = 20.0   
+MAX_INDIVIDUAL_THRUST = 40.0   
 
 ORBIT_DIRECTION       = 1  # 1: CCW, -1: CW
 PERCENTILE_FRACTION   = 0.10 #
@@ -85,9 +85,6 @@ MEDIAN_WINDOW         = 7      # moving-median filter size [cycles]
 SPIKE_THRESHOLD       = 0.5    # [m]   max allowed jump per cycle
 
 # Lost-wall recovery
-LOST_WALL_TIMEOUT     = 2.0    # [s]   time without sonar before LOST_WALL state
-LOST_WALL_GRACE_S     = 2.0    # [s]   startup grace: don't trigger LOST_WALL before first sonar frame
-RECOVERY_YAW_CMD      = 4.0    # [N·m] slow spin while searching
 
 LAP_YAW_THRESHOLD     = 2.0 * math.pi   # Un tour complet
 LAP_START_DELAY       = 2.0             # Délai de sécurité au début (en secondes)
@@ -95,7 +92,7 @@ LOST_WALL_TIMEOUT     = 2.0             # Temps avant de déclarer le mur "perdu
 LOST_WALL_GRACE_S     = 2.0             # Délai de grâce au lancement
 RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter le tour (yaw)
 
-DEPTH_STEP            = 2.0             # Incrément de profondeur pour chaque palier
+DEPTH_STEP            = 1.0             # Incrément de profondeur pour chaque palier
 FINAL_DEPTH_LIMIT     = -6.0            # Profondeur finale d'arrêt de la mission
 
 # ── Thruster allocation (identical to net_approach.py) ────────────────────────
@@ -107,7 +104,7 @@ LEVER = 0.1697
 TAM = np.array([
     [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
     [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
-    [ 0.0,    0.0,    0.0,    0.0,   -1.0,   1.0,   1.0,  -1.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,   -1.0,  1.0,   1.0,  -1.0 ],
     [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218],
     [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ],
     [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
@@ -260,8 +257,16 @@ class Phase3InspectionNode(Node):
         self.create_subscription(
             PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos
         )
+        # Changed to VOLATILE so tools like Foxglove and ros2 topic pub can trigger it reliably
+        latching_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         self.create_subscription(
-            Bool, '/mission/phase2_done', self._phase2_done_cb, 10
+            Bool, '/mission/phase2_done', self._phase2_done_cb, latching_qos
         )
 
         # ── Publishers ───────────────────────────────────────────────────────
@@ -318,7 +323,7 @@ class Phase3InspectionNode(Node):
         self.net_angle_error: float = 0.0
 
         # PID controllers
-        self._pid_depth = PID(KP_DEPTH, KI_DEPTH, KD_DEPTH, integral_limit=15.0)
+        self._pid_depth = PID(KP_DEPTH, KI_DEPTH, KD_DEPTH, integral_limit=50.0)
         self._pid_dist  = PID(KP_DIST,  KI_DIST,  KD_DIST,  integral_limit=10.0)
         self._pid_yaw   = PID(KP_YAW,   KI_YAW,   KD_YAW,   integral_limit=10.0)
         
@@ -558,7 +563,7 @@ class Phase3InspectionNode(Node):
         # 3. Vitesse de progression (Fy - Sway) : Objectif 0.2 m/s
         # On ne bouge latéralement que si la profondeur est atteinte (marge de 15cm)
         if abs(depth_error) < 0.15:
-            target_vy = float(ORBIT_DIRECTION * 0.2)
+            target_vy = float(ORBIT_DIRECTION * 0.30)
             vy_error = target_vy - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
         else:
@@ -568,7 +573,7 @@ class Phase3InspectionNode(Node):
             
             # On empêche de compter ce tour en réinitialisant le délai
             # (Pour utiliser l'horloge de façon propre on peut stocker le temps mais "reset" le yaw)
-            self._accumulated_yaw = 0.0
+            
 
         # 4. Perpendicularité (Mz - Yaw) : S'aligner sur l'angle des points les plus proches
         # net_angle_error est maintenant l'angle moyen des points proches uniquement
