@@ -59,7 +59,7 @@ PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 # ── Random spawn on circle ────────────────────────────────────────────────────
 
 _SPAWN_RADIUS = 3.4    # [m]  circle radius
-_SPAWN_DEPTH  = -2   # [m]  constant depth (negative = underwater in NED-like frame)
+_SPAWN_DEPTH  = -1   # [m]  constant depth (negative = underwater in NED-like frame)
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)

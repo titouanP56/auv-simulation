@@ -54,7 +54,7 @@ STANDOFF_DIST         = 1.5
 CONTROL_RATE_HZ       = 20.0   
 
 # Gains optimisés pour la stabilité et la réactivité
-KP_DEPTH              = 15.0
+KP_DEPTH              = 100.0
 KI_DEPTH              = 0.05
 KD_DEPTH              = 1.0
 BUOYANCY_COMP         = 3.0    
@@ -74,10 +74,10 @@ KP_YAW                = 10.0
 KI_YAW                = 0.02
 KD_YAW                = 3.0  # Damping augmenté pour éviter les oscillations
 
-MAX_DEPTH_CMD         = 20.0   
+MAX_DEPTH_CMD         = 150.0
 MAX_DIST_CMD          = 15.0   
 MAX_YAW_CMD           = 20.0   
-MAX_INDIVIDUAL_THRUST = 20.0   
+MAX_INDIVIDUAL_THRUST = 100.0   
 
 ORBIT_DIRECTION       = 1  # 1: CCW, -1: CW
 PERCENTILE_FRACTION   = 0.10 #
@@ -104,7 +104,7 @@ LEVER = 0.1697
 TAM = np.array([
     [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
     [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
-    [ 0.0,    0.0,    0.0,    0.0,   -1.0,   1.0,   1.0,  -1.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,   1.0,   1.0,   1.0,  1.0 ],
     [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218],
     [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ],
     [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
@@ -542,7 +542,7 @@ class Phase3InspectionNode(Node):
             Fx = self._last_fx
 
         # 3. Vitesse de progression (Fy - Sway) : Objectif 0.2 m/s
-        target_vy = float(ORBIT_DIRECTION * 0.2)
+        target_vy = float(ORBIT_DIRECTION * 0.25)
         vy_error = target_vy - self.current_vy
         Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
 

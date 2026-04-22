@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/world', ['world/Bassin_ntnu.xml', 'world/Bassin_ntnu_waves.xml', 'world/ocean_40m.xml']),
+        ('share/' + package_name + '/world', ['world/Bassin_ntnu.xml', 'world/Bassin_ntnu_waves.xml', 'world/ocean_40m.xml', 'world/small_net.xml']),
         ('share/' + package_name + '/urdf', ['urdf/BlueROV2.urdf.xml', 'urdf/BlueROV2captors.urdf.xml', 'urdf/Bluerov2_realistic.urdf.xml']),
         ('share/' + package_name + '/launch', ['launch/bluerov2_bassin.launch.py', 'launch/bluerov2_bassin_captors.launch.py', 'launch/bluerov2_bassin_waves.launch.py', 'launch/bluerov2_ocean_realistic.launch.py', 'launch/bluerov2_realist_bassin.launch.py']),
         ('share/' + package_name + '/meshes/bluerov2', [

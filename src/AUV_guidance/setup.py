@@ -10,7 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/net_inspection.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/net_full_inspection.launch.py',
+        'launch/net_inspection.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,9 +28,10 @@ setup(
     entry_points={
         'console_scripts': [
             'net_approach = AUV_guidance.net_approach:main',
-            'lawnmower_trajectory_node = AUV_guidance.lawnmower_trajectory_node:main',
-            'reactive_wall_follower = AUV_guidance.reactive_wall_follower:main',
-            'wall_following_node = AUV_guidance.wall_following_node:main',
+            'phase3_inspection = AUV_guidance.phase3_inspection:main',
+            'reactive_wall_following = AUV_guidance.reactive_wall_following:main',
+            'wall_following = AUV_guidance.wall_following:main',
+            'lawnmower = AUV_guidance.lawnmower:main',
         ],
     },
 )

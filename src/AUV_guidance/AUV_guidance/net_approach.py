@@ -35,13 +35,13 @@ STANDOFF_DIST     = 1.5     # [m]
 APPROACH_TOL      = 0.10    # [m]
 STABILIZE_TIME    = 3.0     # [s]
 
-KP_DEPTH  = 15.0
+KP_DEPTH  = 30.0
 BUOYANCY_COMPENSATION = 3.0
 KP_YAW    = 5.0
 KD_YAW    = 2.0
 KP_SURGE  = 6.0
 
-MAX_DEPTH_CMD   = 20.0
+MAX_DEPTH_CMD   = 40.0
 MAX_YAW_CMD     = 40.0
 MAX_SURGE_CMD   = 25.0
 
