@@ -25,23 +25,23 @@ from tf2_ros import TransformBroadcaster
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 TARGET_DEPTH      = -2.0    # [m]
-DEPTH_TOLERANCE   = 0.3    # [m]
+DEPTH_TOLERANCE   = 0.2    # [m]
 DEPTH_HOLD_TIME   = 2.0     # [s]
 
-YAW_TOLERANCE     = math.radians(8.0)
+YAW_TOLERANCE     = math.radians(10.0)
 YAW_HOLD_TIME     = 1.0     # [s]
 
 STANDOFF_DIST     = 1.5     # [m]
 APPROACH_TOL      = 0.10    # [m]
 STABILIZE_TIME    = 3.0     # [s]
 
-KP_DEPTH  = 150.0
-BUOYANCY_COMPENSATION = -10.0
+KP_DEPTH  = 30.0
+BUOYANCY_COMPENSATION = 3.0
 KP_YAW    = 5.0
 KD_YAW    = 2.0
 KP_SURGE  = 6.0
 
-MAX_DEPTH_CMD   = 120.0
+MAX_DEPTH_CMD   = 20.0
 MAX_YAW_CMD     = 40.0
 MAX_SURGE_CMD   = 25.0
 
@@ -63,7 +63,7 @@ TAM = np.array([
     [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
 ])
 TAM_PINV = np.linalg.pinv(TAM)
-MAX_INDIVIDUAL_THRUST = 40.0
+MAX_INDIVIDUAL_THRUST = 20.0
 
 class State:
     DESCENDING  = "DESCENDING"

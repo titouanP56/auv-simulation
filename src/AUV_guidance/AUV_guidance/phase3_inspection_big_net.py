@@ -93,7 +93,7 @@ LOST_WALL_GRACE_S     = 2.0             # Délai de grâce au lancement
 RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter le tour (yaw)
 
 DEPTH_STEP            = 0.5             # Incrément de profondeur pour chaque palier
-FINAL_DEPTH_LIMIT     = -6.0            # Profondeur finale d'arrêt de la mission
+FINAL_DEPTH_LIMIT     = -29.5            # Profondeur finale d'arrêt de la mission
 
 # ── Thruster allocation (identical to net_approach.py) ────────────────────────
 
