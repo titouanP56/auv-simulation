@@ -4,8 +4,8 @@ This package contains the robot description (URDF/Xacro), Gazebo simulation worl
 
 ## Main Features
 - **Robot Descriptions**: URDF and Xacro files for the BlueROV2, including modular configurations with various sensors (DVL, IMU, Camera, Ping360 Sonar, Sonoptix Echo, depth sensor) and a a **realistic version**.
-- **Gazebo Simulation**: Simulation environments (`Bassin_ntnu.xml`, `small_net.xml`).
-- **Optimized Net Model**: `small_net.xml` utilizes a cylindrical collision geometry optimized for stable Sonoptix sonar detection during orbits.
+- **Gazebo Simulation**: Simulation environments (`Bassin_ntnu.xml`, `small_net.xml`, `small_net_deforme.xml`).
+- **Optimized Net Models**: `small_net.xml` utilizes a small version of the net for faster testing. `small_net_deforme.xml` additionally includes a static cylinder (5m diameter, 6m depth) slightly deformed to test the robustness of the algorithms.
 - **Launch Files**: Comprehensive launch files that spawn the robot in Gazebo, start the `robot_state_publisher`, and set up `ros_gz_bridge` for communication between Gazebo and ROS 2.
 - **Utility Nodes (Python)**: Includes nodes to correct or process simulation data for ROS 2 navigation (`simulated_depth_sensor`, `imu_republisher`).
 
@@ -24,6 +24,7 @@ This package contains the robot description (URDF/Xacro), Gazebo simulation worl
 - `bluerov2_bassin_waves.launch.py`: Launches the **realistic BlueROV2** in the NTNU basin with waves. (not working) 
 - `bluerov2_realist_bassin.launch.py`: Launches the **realistic BlueROV2** in the NTNU basin without waves.
 - `small_net.xml`: Optimized 10m diameter cylindrical net world for reactive Phase 3 inspection.
+- `small_net_deforme.xml`: Deformed 10m diameter cylindrical net.
 
 ## Usage
 

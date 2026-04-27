@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch/net_full_inspection.launch.py',
             'launch/net_inspection_big_net.launch.py',
+            'launch/net_full_inspection_deforme.launch.py',
         ]),
     ],
     install_requires=['setuptools'],

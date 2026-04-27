@@ -47,7 +47,7 @@ source install/setup.bash
 Start the virtual environment and spawn the robot. In the same terminal, run:
 
 - **Full Mission (Approach + Cyclic Inspection)**:
-  Launches the realistic world, robot, EKF, and the sequenced phase of approach and phase of inspection.
+  Launches the realistic world, robot, EKF, and the sequenced phase of approach and multi-depth cyclic phase of inspection.
   ```bash
   ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
   ```
