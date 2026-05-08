@@ -18,7 +18,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan, PointCloud2
-from geometry_msgs.msg import TransformStamped, PoseStamped
+from geometry_msgs.msg import TransformStamped, PoseStamped, Wrench
 from tf2_ros import TransformBroadcaster
 
 
@@ -50,19 +50,6 @@ SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)
 
 CONTROL_RATE_HZ = 20.0
 
-THRUST_COEFFS = [-0.002, 0.002, 0.002, -0.002, -0.002, 0.002, 0.002, -0.002]
-SIN45 = 0.7071
-LEVER = 0.1697
-
-TAM = np.array([
-    [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
-    [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
-    [ 0.0,    0.0,    0.0,    0.0,   -1.0,   1.0,   1.0,  -1.0 ],
-    [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218],
-    [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ],
-    [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
-])
-TAM_PINV = np.linalg.pinv(TAM)
 MAX_INDIVIDUAL_THRUST = 20.0
 
 class State:
@@ -133,7 +120,7 @@ class Phase2MissionNode(Node):
         self.ping360_sub = self.create_subscription(LaserScan, '/ping360/scan', self._ping360_cb, best_effort_qos)
         self.sonoptix_sub = self.create_subscription(PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
 
-        self._thrust_pubs = [self.create_publisher(Float64, f'/cmd_vel_{i}', 10) for i in range(1, 9)]
+        self.wrench_pub = self.create_publisher(Wrench, '/auv/command_wrench', 10)
         # Changed to VOLATILE so tools like Foxglove and ros2 topic pub can trigger it reliably
         latching_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
@@ -374,13 +361,13 @@ class Phase2MissionNode(Node):
         Fz = getattr(self, '_cmd_Fz', 0.0)
         Mz = getattr(self, '_cmd_Mz', 0.0)
 
-        tau = np.array([Fx, 0.0, Fz, 0.0, 0.0, Mz])
-        thrusts = np.clip(TAM_PINV @ tau, -MAX_INDIVIDUAL_THRUST, MAX_INDIVIDUAL_THRUST)
-
-        for i, (thrust, coeff) in enumerate(zip(thrusts, THRUST_COEFFS)):
-            msg = Float64()
-            msg.data = float(thrust) * math.copysign(1.0, coeff)
-            self._thrust_pubs[i].publish(msg)
+        wrench_msg = Wrench()
+        wrench_msg.force.x = Fx
+        wrench_msg.force.y = 0.0
+        wrench_msg.force.z = Fz
+        wrench_msg.torque.z = Mz
+        
+        self.wrench_pub.publish(wrench_msg)
 
         self._cmd_Fx, self._cmd_Fz, self._cmd_Mz = 0.0, 0.0, 0.0
 

@@ -14,6 +14,7 @@ setup(
             'launch/net_full_inspection.launch.py',
             'launch/net_inspection_big_net.launch.py',
             'launch/net_full_inspection_deforme.launch.py',
+            'launch/net_full_inspection_current.launch.py', 
         ]),
     ],
     install_requires=['setuptools'],
@@ -33,6 +34,9 @@ setup(
             'net_approach = AUV_guidance.net_approach:main',
             'phase3_inspection = AUV_guidance.phase3_inspection:main',
             'phase3_inspection_big_net = AUV_guidance.phase3_inspection_big_net:main',
+            'phase3_inspection_current = AUV_guidance.phase3_inspection_current:main',
+            'bluerov2_bridge = AUV_guidance.bluerov2_bridge:main',
+            'sim_thruster_bridge = AUV_guidance.sim_thruster_bridge:main',
         ],
     },
 )

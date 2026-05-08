@@ -40,8 +40,9 @@ from launch.actions import (
     IncludeLaunchDescription,
     SetEnvironmentVariable,
     TimerAction,
+    ExecuteProcess,
 )
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -95,7 +96,7 @@ def generate_launch_description():
 
     world_file_arg = DeclareLaunchArgument(
         'world_file',
-        default_value='small_net.xml',
+        default_value='small_net_current.xml',
         description='World file name (must live in AUV_description/world/)',
     )
 
@@ -105,17 +106,10 @@ def generate_launch_description():
         description='Seconds to wait after Gazebo starts before activating mission nodes',
     )
 
-    use_hardware_arg = DeclareLaunchArgument(
-        'use_hardware',
-        default_value='False',
-        description='Launch MAVROS and bluerov2_bridge instead of Gazebo sim',
-    )
-
     headless    = LaunchConfiguration('headless')
     rviz        = LaunchConfiguration('rviz')
     world_file  = LaunchConfiguration('world_file')
     gz_delay    = LaunchConfiguration('gz_delay')
-    use_hardware = LaunchConfiguration('use_hardware')
 
     # ── Gazebo resource path ──────────────────────────────────────────────────
 
@@ -139,7 +133,6 @@ def generate_launch_description():
             os.path.join(PKG_GZ_SIM, 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={'gz_args': gz_args}.items(),
-        condition=UnlessCondition(use_hardware),
     )
 
     # ── URDF / robot description ──────────────────────────────────────────────
@@ -173,7 +166,6 @@ def generate_launch_description():
             '-Y', str(_spawn_yaw),
         ],
         output='screen',
-        condition=UnlessCondition(use_hardware),
     )
 
     # ── Sensor + topic bridges (Gazebo ↔ ROS 2) ───────────────────────────────
@@ -219,7 +211,6 @@ def generate_launch_description():
         remappings=bridge_remappings,
         output='screen',
         parameters=[{'use_sim_time': True}],
-        condition=UnlessCondition(use_hardware),
     )
 
     # ── Helper sensor nodes ───────────────────────────────────────────────────
@@ -230,7 +221,6 @@ def generate_launch_description():
         name='simulated_depth_sensor',
         output='screen',
         parameters=[{'use_sim_time': True}],
-        condition=UnlessCondition(use_hardware),
     )
 
     dvl_bridge = Node(
@@ -239,7 +229,6 @@ def generate_launch_description():
         name='dvl_bridge_node',
         output='screen',
         parameters=[{'use_sim_time': True}],
-        condition=UnlessCondition(use_hardware),
     )
 
     imu_republisher = Node(
@@ -248,16 +237,6 @@ def generate_launch_description():
         name='imu_republisher',
         output='screen',
         parameters=[{'use_sim_time': True}],
-        condition=UnlessCondition(use_hardware),
-    )
-
-    sim_thruster_bridge_node = Node(
-        package='AUV_guidance',
-        executable='sim_thruster_bridge',
-        name='sim_thruster_bridge',
-        output='screen',
-        parameters=[{'use_sim_time': True}],
-        condition=UnlessCondition(use_hardware),
     )
 
     # ── EKF localisation ──────────────────────────────────────────────────────
@@ -300,34 +279,6 @@ def generate_launch_description():
         ],
     )
 
-    # ── MAVROS & Hardware Bridge ──────────────────────────────────────────────
-
-    try:
-        mavros_pkg_path = get_package_share_directory('mavros')
-    except Exception:
-        mavros_pkg_path = ''
-
-    mavros_node = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(mavros_pkg_path, 'launch', 'node.launch.py')
-        ),
-        launch_arguments={
-            'fcu_url': 'udp://192.168.2.1:14550@192.168.2.2:14555',
-            'gcs_url': 'udp://@localhost:14550',
-            'tgt_system': '1',
-            'tgt_component': '1',
-        }.items(),
-        condition=IfCondition(use_hardware),
-    )
-
-    bluerov2_bridge_node = Node(
-        package='AUV_guidance',
-        executable='bluerov2_bridge',
-        name='bluerov2_bridge',
-        output='screen',
-        condition=IfCondition(use_hardware),
-    )
-
     # ── RViz2 (optional) ──────────────────────────────────────────────────────
 
     rviz_node = Node(
@@ -355,15 +306,21 @@ def generate_launch_description():
 
     phase3_node = Node(
         package='AUV_guidance',
-        executable='phase3_inspection',
-        name='phase3_inspection',
+        executable='phase3_inspection_current',
+        name='phase3_inspection_current',
         output='screen',
         parameters=[{'use_sim_time': True}],
     )
 
+    # Publish an ocean current dynamically once the simulator starts
+    ocean_current_process = ExecuteProcess(
+        cmd=['gz', 'topic', '-t', '/ocean_current', '-m', 'gz.msgs.Vector3d', '-p', 'x: 0.2, y: -0.15, z: 0.0'],
+        output='screen'
+    )
+
     delayed_mission = TimerAction(
         period=gz_delay,
-        actions=[net_approach_node, phase3_node],
+        actions=[net_approach_node, phase3_node, ocean_current_process],
     )
 
     # ── Assembly ──────────────────────────────────────────────────────────────
@@ -374,7 +331,6 @@ def generate_launch_description():
         rviz_arg,
         world_file_arg,
         gz_delay_arg,
-        use_hardware_arg,
 
         # Environment
         gz_resource_path,
@@ -389,11 +345,6 @@ def generate_launch_description():
         simulated_depth_sensor,
         dvl_bridge,
         imu_republisher,
-        sim_thruster_bridge_node,
-
-        # Hardware MAVROS
-        mavros_node,
-        bluerov2_bridge_node,
 
         # Localisation
         robot_localization,

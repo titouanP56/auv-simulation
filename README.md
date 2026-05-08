@@ -51,6 +51,7 @@ Start the virtual environment and spawn the robot. In the same terminal, run:
   ```bash
   ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
   ```
+  *Note: Add `use_hardware:=True` to launch with MAVROS and the `bluerov2_bridge` instead of Gazebo for real robot deployment.*
 
 Alternatively, you can launch standalone simulation environments (useful for manual testing):
 - **Equipped with sensors in a basin**: `ros2 launch AUV_description bluerov2_bassin_captors.launch.py`

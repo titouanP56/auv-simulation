@@ -44,7 +44,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
-from geometry_msgs.msg import PoseStamped, Wrench
+from geometry_msgs.msg import PoseStamped
 import tf2_ros
 
 # ── Physical constants (identical to net_approach.py) ─────────────────────────
@@ -56,31 +56,27 @@ CONTROL_RATE_HZ       = 20.0
 # Gains optimisés pour la stabilité et la réactivité
 KP_DEPTH              = 20.0
 KI_DEPTH              = 0.2
-KD_DEPTH              = 5.0
+KD_DEPTH              = 20.0
 BUOYANCY_COMP         = 3.0    
 
-# PID Distance (Fx - Surge) : Maintient le robot à 1.5m
-KP_DIST               = 12.0
-KI_DIST               = 0.2
-KD_DIST               = 1.0
+# PID Distance (Fx - Surge) : Maintient le robot à 1.5m face au courant
+KP_DIST               = 15.0
+KI_DIST               = 4.0  # Augmenté pour contrer le courant (était 2.0)
+KD_DIST               = 1.5
 
-# PID Vitesse Latérale (Fy - Sway) : Pour atteindre 0.2 m/s malgré la traînée
-KP_VEL_SWAY           = 40.0
-KI_VEL_SWAY           = 2.0
-KD_VEL_SWAY           = 0.5
+# PID Vitesse Latérale (Fy - Sway) : Pour atteindre 0.2 m/s malgré le courant
+KP_VEL_SWAY           = 50.0
+KI_VEL_SWAY           = 10.0 # Très augmenté pour vaincre le courant latéral
+KD_VEL_SWAY           = 1.0
 
 # PID Alignement (Mz - Yaw) : Verrouillage sur le point le plus proche
-KP_YAW                = 10.0
-KI_YAW                = 0.02
-KD_YAW                = 3.0  # Damping augmenté pour éviter les oscillations
+KP_YAW                = 15.0
+KI_YAW                = 0.5  # Modéré, mais nécessaire pour l'alignement face au courant
+KD_YAW                = 4.0
 
-KP_PITCH              = 10.0
-KI_PITCH              = 0.2
-KD_PITCH              = 2.0
-
-MAX_DEPTH_CMD         = 15.0   
-MAX_DIST_CMD          = 15.0   
-MAX_YAW_CMD           = 20.0   
+MAX_DEPTH_CMD         = 20.0   
+MAX_DIST_CMD          = 40.0   # Augmenté pour éviter la saturation avant que l'intégrale compense le courant
+MAX_YAW_CMD           = 30.0   
 MAX_INDIVIDUAL_THRUST = 40.0   
 
 ORBIT_DIRECTION       = 1  # 1: CCW, -1: CW
@@ -98,6 +94,22 @@ RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter 
 
 DEPTH_STEP            = 0.5             # Incrément de profondeur pour chaque palier
 FINAL_DEPTH_LIMIT     = -6.0            # Profondeur finale d'arrêt de la mission
+
+# ── Thruster allocation (identical to net_approach.py) ────────────────────────
+
+THRUST_COEFFS = [-0.002, 0.002, 0.002, -0.002, -0.002, 0.002, 0.002, -0.002]
+SIN45 = 0.7071
+LEVER = 0.1697
+
+TAM = np.array([
+    [ SIN45,  SIN45, -SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
+    [ SIN45, -SIN45,  SIN45, -SIN45,  0.0,   0.0,   0.0,   0.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,   -1.0,  1.0,   1.0,  -1.0 ],
+    [ 0.0,    0.0,    0.0,    0.0,    0.218, 0.218, 0.218, 0.218],
+    [ 0.0,    0.0,    0.0,    0.0,    0.12, -0.12,  0.12, -0.12 ],
+    [ LEVER, -LEVER, -LEVER,  LEVER,  0.0,   0.0,   0.0,   0.0 ],
+], dtype=float)
+TAM_PINV = np.linalg.pinv(TAM)
 
 
 # ── State labels ───────────────────────────────────────────────────────────────
@@ -170,21 +182,18 @@ class PID:
 
 # ── Sonar processing ───────────────────────────────────────────────────────────
 
-def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float | None, float | None]:
+def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float]:
     """
     Extrait la distance ET l'angle du point le plus proche pour la perpendicularité.
-    Extrait aussi les distances médianes HAUT et BAS pour l'asservissement de normale (Pitch).
     """
     field_map = {f.name: f for f in msg.fields}
     if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
-        return None, 0.0, None, None
+        return None, 0.0
 
     point_step, data = msg.point_step, msg.data
     x_off, y_off, z_off = field_map['x'].offset, field_map['y'].offset, field_map['z'].offset
 
     valid_points = []
-    top_points = []
-    bottom_points = []
 
     for i in range(msg.width * msg.height):
         base = i * point_step
@@ -205,13 +214,9 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
             continue
 
         valid_points.append((dist, angle))
-        if pz > 0:
-            top_points.append(dist)
-        elif pz < 0:
-            bottom_points.append(dist)
 
     if not valid_points:
-        return None, 0.0, None, None
+        return None, 0.0
 
     # TRI PAR DISTANCE : On veut s'aligner sur la partie la plus proche
     valid_points.sort(key=lambda p: p[0])
@@ -220,27 +225,15 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     n_use = max(1, int(len(valid_points) * PERCENTILE_FRACTION))
     closest_points = valid_points[:n_use]
 
-    avg_dist = float(np.mean([p[0] for p in closest_points]))
-    avg_angle = float(np.mean([p[1] for p in closest_points]))
+    avg_dist = np.mean([p[0] for p in closest_points])
+    avg_angle = np.mean([p[1] for p in closest_points])
 
-    dist_top = None
-    if top_points:
-        top_points.sort()
-        n_top = max(1, int(len(top_points) * PERCENTILE_FRACTION))
-        dist_top = float(np.median(top_points[:n_top]))
-
-    dist_bottom = None
-    if bottom_points:
-        bottom_points.sort()
-        n_bot = max(1, int(len(bottom_points) * PERCENTILE_FRACTION))
-        dist_bottom = float(np.median(bottom_points[:n_bot]))
-
-    return avg_dist, avg_angle, dist_top, dist_bottom
+    return float(avg_dist), float(avg_angle)
 
 
 # ── Main node ──────────────────────────────────────────────────────────────────
 
-class Phase3InspectionNode(Node):
+class Phase3InspectionCurrentNode(Node):
     """
     Phase 3 — Reactive 360° wall-following inspection.
 
@@ -249,7 +242,7 @@ class Phase3InspectionNode(Node):
     """
 
     def __init__(self):
-        super().__init__('phase3_inspection')
+        super().__init__('phase3_inspection_current')
 
         best_effort_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -277,7 +270,10 @@ class Phase3InspectionNode(Node):
         )
 
         # ── Publishers ───────────────────────────────────────────────────────
-        self.wrench_pub = self.create_publisher(Wrench, '/auv/command_wrench', 10)
+        self._thrust_pubs = [
+            self.create_publisher(Float64, f'/cmd_vel_{i}', 10)
+            for i in range(1, 9)
+        ]
         self.phase3_done_pub = self.create_publisher(Bool, '/mission/phase3_done', 10)
         self.phase_pub       = self.create_publisher(String, '/mission/phase', 10)
 
@@ -296,13 +292,8 @@ class Phase3InspectionNode(Node):
         self.cmd_fy_pub          = self.create_publisher(Float64, '/phase3/cmd_Fy',           10)
         self.cmd_fz_pub          = self.create_publisher(Float64, '/phase3/cmd_Fz',           10)
         self.cmd_mz_pub          = self.create_publisher(Float64, '/phase3/cmd_Mz',           10)
-        self.cmd_my_pub          = self.create_publisher(Float64, '/phase3/cmd_My',           10)
         # Yaw cumulé (progression du tour)
         self.yaw_accum_pub       = self.create_publisher(Float64, '/phase3/yaw_accumulated',  10)
-        self.current_radius_pub  = self.create_publisher(Float64, '/phase3/current_radius',   10)
-        self.r_ref_pub           = self.create_publisher(Float64, '/phase3/r_ref',            10)
-        self.walking_time_pub    = self.create_publisher(Float64, '/phase3/walking_time',     10)
-        self.accumulated_dist_pub = self.create_publisher(Float64, '/phase3/accumulated_dist', 10)
 
         # ── TF2 & Relative Télémétrie ─────────────────────────────────────────
         self.tf_buffer = tf2_ros.Buffer()
@@ -330,23 +321,13 @@ class Phase3InspectionNode(Node):
         self._sonar_median = MovingMedian(MEDIAN_WINDOW)
         self._last_sonar_time: float | None = None
         self.net_angle_error: float = 0.0
-        self.dist_top: float | None = None
-        self.dist_bottom: float | None = None
-
-        # Cone and Radius Tracking
-        self.in_cone_mode = False
-        self.cone_transition_start_time = None
-        self.apex_condition_start_time = None
-        self.R_ref = None
-        self.radius_samples = []
 
         # PID controllers
-        self._pid_depth = PID(KP_DEPTH, KI_DEPTH, KD_DEPTH, integral_limit=50.0)
-        self._pid_dist  = PID(KP_DIST,  KI_DIST,  KD_DIST,  integral_limit=10.0)
-        self._pid_yaw   = PID(KP_YAW,   KI_YAW,   KD_YAW,   integral_limit=10.0)
-        self._pid_pitch = PID(KP_PITCH, KI_PITCH, KD_PITCH, integral_limit=10.0)
+        self._pid_depth = PID(KP_DEPTH, KI_DEPTH, KD_DEPTH, integral_limit=80.0)
+        self._pid_dist  = PID(KP_DIST,  KI_DIST,  KD_DIST,  integral_limit=100.0)
+        self._pid_yaw   = PID(KP_YAW,   KI_YAW,   KD_YAW,   integral_limit=30.0)
         
-        self._pid_velocity_sway = PID(15.0, 0.5, 0.0, integral_limit=20.0)
+        self._pid_velocity_sway = PID(KP_VEL_SWAY, KI_VEL_SWAY, KD_VEL_SWAY, integral_limit=100.0)
 
         self._last_fx = 0.0
 
@@ -356,10 +337,6 @@ class Phase3InspectionNode(Node):
         self._accumulated_yaw = 0.0
         self._lap_start_time: float | None = None
         self._walking_start_time: float | None = None  # set when WALKING_THE_NET begins
-        self._first_walking_start_time: float | None = None  # absolute start of WALKING_THE_NET
-        self._accumulated_walking_time = 0.0  # active time spent in WALKING_THE_NET
-        self._accumulated_dist = 0.0
-        self._last_R_calculated = 0.0
 
         # Timing
         self._dt = 1.0 / CONTROL_RATE_HZ
@@ -389,7 +366,7 @@ class Phase3InspectionNode(Node):
         if self.state not in (State.WALKING_THE_NET, State.LOST_WALL):
             return
 
-        raw, angle, dist_top, dist_bottom = _extract_wall_distance(msg)
+        raw, angle = _extract_wall_distance(msg)
         if raw is None:
             # We explicitly update the timestamp anyway, because receiving
             # an "empty" pointcloud proves the sensor is alive, just seeing nothing.
@@ -414,15 +391,12 @@ class Phase3InspectionNode(Node):
         self._raw_net_range  = filtered
         self._last_sonar_time = self.get_clock().now().nanoseconds * 1e-9
         self.net_angle_error = angle
-        self.dist_top = dist_top
-        self.dist_bottom = dist_bottom
 
     def _phase2_done_cb(self, msg: Bool):
         if msg.data and self.state == State.WAITING:
             self.get_logger().info("[PHASE3] Phase 2 done received — activating inspection orbit.")
             self.state = State.WALKING_THE_NET
             self._walking_start_time = self.get_clock().now().nanoseconds * 1e-9
-            self._first_walking_start_time = self._walking_start_time
             # Reset sonar history so stale Phase-2 timestamps don't cause
             # an immediate sonar_age > LOST_WALL_TIMEOUT at the first loop cycle.
             self._last_sonar_time = None
@@ -473,11 +447,7 @@ class Phase3InspectionNode(Node):
             done_msg = Bool()
             done_msg.data = True
             self.phase3_done_pub.publish(done_msg)
-            # Maintient la profondeur cible même une fois complété
-            depth_error = self.target_depth - self.current_z
-            fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
-            Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
-            self._publish_thrusters(0.0, 0.0, Fz, 0.0, 0.0)
+            self._publish_thrusters(0.0, 0.0, 0.0, 0.0)
             return
 
         # ── Yaw-accumulation for lap tracking ─────────────────────────────
@@ -504,68 +474,6 @@ class Phase3InspectionNode(Node):
         yaw_acc_msg = Float64()
         yaw_acc_msg.data = self._accumulated_yaw
         self.yaw_accum_pub.publish(yaw_acc_msg)
-
-        # ── Radius Tracking and Cone Transition ───────────────────────────
-        # Intégration de la distance latérale parcourue
-        self._accumulated_dist += abs(self.current_vy) * dt
-
-        acc_dist_msg = Float64()
-        acc_dist_msg.data = self._accumulated_dist
-        self.accumulated_dist_pub.publish(acc_dist_msg)
-
-        if abs(self._accumulated_yaw) > 0.4:
-            current_radius = self._accumulated_dist / abs(self._accumulated_yaw)
-        elif self._last_R_calculated > 0.0:
-            current_radius = self._last_R_calculated
-        else:
-            current_radius = 10.0  # Safe large value initially
-
-        radius_msg = Float64()
-        radius_msg.data = current_radius
-        self.current_radius_pub.publish(radius_msg)
-
-        if self.state == State.WALKING_THE_NET:
-            self._accumulated_walking_time += dt
-
-        walking_time_msg = Float64()
-        walking_time_msg.data = self._accumulated_walking_time
-        self.walking_time_pub.publish(walking_time_msg)
-
-        if self._first_walking_start_time is not None:
-            if self.R_ref is None:
-                if self._accumulated_walking_time < 30.0:
-                    if self.state == State.WALKING_THE_NET:
-                        self.radius_samples.append(current_radius)
-                elif self.radius_samples:
-                    self.R_ref = float(np.mean(self.radius_samples))
-                    self.get_logger().info(f"[PHASE3] R_ref calculated: {self.R_ref:.2f} m (moyenne sur les {len(self.radius_samples)} échantillons des 30 premières secondes actives).")
-
-            if self.R_ref is not None and not self.in_cone_mode:
-                if current_radius < 0.9 * self.R_ref:
-                    if self.cone_transition_start_time is None:
-                        self.cone_transition_start_time = now
-                    elif now - self.cone_transition_start_time > 3.0:
-                        self.in_cone_mode = True
-                        self.get_logger().info("Transition Cône détectée")
-                else:
-                    self.cone_transition_start_time = None
-
-            # Condition d'Arrêt Global (Apex) avec persistance de 5 secondes
-            if self.in_cone_mode:
-                if current_radius < 1.0:
-                    if self.apex_condition_start_time is None:
-                        self.apex_condition_start_time = now
-                    elif now - self.apex_condition_start_time > 5.0:
-                        self.get_logger().info("Apex atteint et stable (rayon < 1m pendant 5s). Fin de la mission et remontée.")
-                        self.state = State.LAP_COMPLETED
-                        self.target_depth = -2.0
-                else:
-                    self.apex_condition_start_time = None
-
-        if self.R_ref is not None:
-            r_ref_msg = Float64()
-            r_ref_msg.data = self.R_ref
-            self.r_ref_pub.publish(r_ref_msg)
 
         # ── Evaluate sonar availability ────────────────────────────────────
         sonar_age = (
@@ -614,17 +522,10 @@ class Phase3InspectionNode(Node):
         elapsed_since_start = now - self._lap_start_time if self._lap_start_time else 0.0
         if (elapsed_since_start > LAP_START_DELAY
                 and abs(self._accumulated_yaw) >= LAP_YAW_THRESHOLD):
-            
-            # Calcul final du rayon pour ce tour complet
-            self._last_R_calculated = self._accumulated_dist / (2 * math.pi)
-            
             self.get_logger().info(
                 f"[LAP_COMPLETED] Full orbit done at depth {self.target_depth}! "
-                f"Accumulated yaw: {math.degrees(self._accumulated_yaw):.1f}°, "
-                f"Rayon calculé: {self._last_R_calculated:.2f}m"
+                f"Accumulated yaw: {math.degrees(self._accumulated_yaw):.1f}°"
             )
-            
-            self._accumulated_dist = 0.0
             
             # Check if we can descend to a new plateau
             if self.target_depth - DEPTH_STEP + 0.01 >= FINAL_DEPTH_LIMIT:
@@ -632,9 +533,7 @@ class Phase3InspectionNode(Node):
                 self.target_depth -= DEPTH_STEP
                 self._accumulated_yaw = 0.0
                 self._lap_start_time = now # reset delay to avoid immediate re-trigger
-                self.apex_condition_start_time = None  # reset apex timer on new level
-                cone_status = " (mode Cône maintenu)" if self.in_cone_mode else ""
-                self.get_logger().info(f"[DESCENDING] New target depth: {self.target_depth}{cone_status}")
+                self.get_logger().info(f"[DESCENDING] New target depth: {self.target_depth}")
             else:
                 self.state = State.LAP_COMPLETED
                 self._publish_thrusters(0.0, 0.0, 0.0, 0.0)
@@ -681,23 +580,10 @@ class Phase3InspectionNode(Node):
         yaw_error = self.net_angle_error
         Mz = float(np.clip(self._pid_yaw.compute(yaw_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
 
-        # 5. Asservissement de Normale (My - Pitch) : Rester perpendiculaire à la pente du filet
-        if self.in_cone_mode and self.dist_top is not None and self.dist_bottom is not None:
-            pitch_error = self.dist_top - self.dist_bottom
-            My = float(np.clip(self._pid_pitch.compute(pitch_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
-        else:
-            My = 0.0
-
-        # 6. Priorisation
-        total_cmd = abs(Fx) + abs(Fz) + abs(Mz) + abs(My)
-        if total_cmd + abs(Fy) > MAX_INDIVIDUAL_THRUST:
-            max_fy = max(0.0, MAX_INDIVIDUAL_THRUST - total_cmd)
-            Fy = float(np.clip(Fy, -max_fy, max_fy))
-
-        self._publish_thrusters(Fx, Fy, Fz, Mz, My)
+        self._publish_thrusters(Fx, Fy, Fz, Mz)
         self._publish_diagnostics(Fx, Fy, Fz, Mz, depth_error, 
                                   self.net_range - STANDOFF_DIST if self.net_range else 0.0, 
-                                  yaw_error, My)
+                                  yaw_error)
 
     def _do_lost_wall(self, dt: float):
         """
@@ -715,7 +601,7 @@ class Phase3InspectionNode(Node):
         # Rotation de recherche
         Mz = float(ORBIT_DIRECTION * RECOVERY_YAW_CMD)
 
-        self._publish_thrusters(0.0, Fy, Fz, Mz, 0.0)
+        self._publish_thrusters(0.0, Fy, Fz, Mz)
 
 
     # ── Diagnostic publisher ──────────────────────────────────────────────────
@@ -726,7 +612,6 @@ class Phase3InspectionNode(Node):
         depth_error: float,
         dist_error: float,
         yaw_error: float,
-        My: float = 0.0
     ):
         """Publish all Foxglove monitoring topics in one call."""
         def _pub(publisher, value: float):
@@ -752,25 +637,30 @@ class Phase3InspectionNode(Node):
         _pub(self.cmd_fy_pub, Fy)
         _pub(self.cmd_fz_pub, Fz)
         _pub(self.cmd_mz_pub, Mz)
-        _pub(self.cmd_my_pub, My)
-        
+
     # ── Thruster allocation ───────────────────────────────────────────────────
 
-    def _publish_thrusters(self, Fx: float, Fy: float, Fz: float, Mz: float, My: float = 0.0):
-        wrench_msg = Wrench()
-        wrench_msg.force.x = float(Fx)
-        wrench_msg.force.y = float(Fy)
-        wrench_msg.force.z = float(Fz)
-        wrench_msg.torque.y = float(My)
-        wrench_msg.torque.z = float(Mz)
-        self.wrench_pub.publish(wrench_msg)
+    def _publish_thrusters(self, Fx: float, Fy: float, Fz: float, Mz: float):
+        """
+        Mix generalised forces → individual thrust commands using TAM_PINV.
+
+        tau = [Fx, Fy, Fz, Mx=0, My=0, Mz]
+        """
+        tau = np.array([Fx, Fy, Fz, 0.0, 0.0, Mz], dtype=float)
+        raw_thrusts = TAM_PINV @ tau
+        thrusts = np.clip(raw_thrusts, -MAX_INDIVIDUAL_THRUST, MAX_INDIVIDUAL_THRUST)
+
+        for i, (thrust, coeff) in enumerate(zip(thrusts, THRUST_COEFFS)):
+            msg = Float64()
+            msg.data = float(thrust) * math.copysign(1.0, coeff)
+            self._thrust_pubs[i].publish(msg)
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Phase3InspectionNode()
+    node = Phase3InspectionCurrentNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
