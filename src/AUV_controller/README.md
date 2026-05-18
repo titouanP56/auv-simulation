@@ -1,59 +1,86 @@
-# AUV_controller
+# AUV Controller (Legacy / Research Archive)
 
-This package contains the control and navigation algorithms for the AUV developed in the ROS 2 environment.
+## 1. Introduction for Beginners
 
-It implements controllers ranging from Station Keeping using PID to Model Predictive Control (MPC) to track dynamic trajectories.
+Welcome to the **AUV Controller** package! 
 
-## Main Features
+> [!WARNING]
+> **This package is currently archived.** In the current architecture, the net inspection mission relies on a reactive PID approach handled entirely within the `AUV_guidance` package. This `AUV_controller` package remains as a research archive containing advanced Model Predictive Control (MPC) and legacy Station Keeping logic.
 
-- **MPC Control (Model Predictive Control)**: Uses `do_mpc` and `CASADI` to optimize the submarine's trajectory while respecting physical constraints (maximum thruster force, maximum moments) and the robot's hydrodynamic model.
-- **Station Keeping (PID)**: A classic and robust PID algorithm allowing the AUV to maintain a fixed position and depth against perturbations and buoyancy mismatches.
-- **Open-loop tests**: Various basic scripts to individually test the motors or validate the physical model and hardware integration in Gazebo.
+Think of this package as the theoretical "muscles and reflexes" of the underwater robot (AUV). It was designed to use advanced mathematics to calculate exactly how fast each of the robot's 8 propellers needs to spin to smoothly track complex trajectories using Model Predictive Control (MPC).
 
-## Main Nodes and Scripts
+---
 
-The package is structured to offer several control strategies:
+## 2. Quick Start Guide
 
-### 1. Advanced Controllers (Tracking Targets)
-- **`mpc_controller_net_inspection.py`**: Heavily tuned MPC designed specifically for smooth, constant-distance inspection along a wall/net.
-- **`mpc_controller_sensors.py`**: Standard MPC designed to work with the robot's sensors. Subscribes to `/odometry/filtered` and calculates optimal thruster commands to reach the target.
-- **`station_keeping.py`**: Robust and fast PID controller to maintain the AUV at a stable `(x, y, z, yaw)` position.
-- **`mpc_controller_blueROV.py`**: Theoretical version of the MPC, subscribing directly to exact ground truth `/odom`.
+### Prerequisites
+Make sure your ROS 2 workspace is sourced and built.
 
-### 2. Utilities & Tests (Open Loop)
-Moved or structured in specific sub-folders (`bluerov/` or `tools/`), we find:
-- **`move_forward.py`**, **`move_down.py`**: Basic scripts applying a constant or progressive force. Ideal for testing the direction of rotation of the thrusters or validating that communication with the controller is done correctly, in a unitary way.
-
-## Dependencies
-
-This ROS 2 Python package has strict mathematical dependencies related to MPC control:
-
-- `rclpy`, `std_msgs`, `nav_msgs`, `geometry_msgs`
-- **`do_mpc`**: Python framework for Model Predictive Control.
-- **`casadi`**: Mathematical framework for non-linear optimization (default backend for do_mpc).
-- `numpy`
-
-## Usage
-
-Make sure to have instantiated the simulator or the real robot before linking the controllers.
-
-1. Build and source the workspace:
 ```bash
+cd ~/AUV_project/ros2_AUV
 colcon build --packages-select AUV_controller
 source install/setup.bash
 ```
 
-2. Launch the Station Keeping controller:
+### Running the Controllers
+
+*Note: These nodes are no longer started automatically by the main mission launch files.*
+
+**Run Station Keeping:**
+Keeps the robot at a fixed point using a standard PD controller.
 ```bash
 ros2 run AUV_controller station_keeping
 ```
 
-3. Launch the realistic MPC controller:
-```bash
-ros2 run AUV_controller mpc_controller_realistic
-```
-
-4. Launch the standard sensors MPC:
+**Run the Sensor-based MPC:**
+Handles path tracking using Model Predictive Control with filtered odometry.
 ```bash
 ros2 run AUV_controller mpc_controller_sensors
 ```
+
+**Run Testing Tools:**
+Force the robot to dive or move forward in an open loop (no sensors). Useful for basic hardware engine testing.
+```bash
+ros2 run AUV_controller move_down
+ros2 run AUV_controller move_forward
+```
+
+---
+
+## 3. Technical Architecture
+
+This package uses advanced control theory, primarily Model Predictive Control (MPC) via CasADi and `do_mpc`, and Proportional-Derivative (PD) control.
+
+### Core Nodes
+
+1. **`mpc_controller_sensors`**:
+   - An MPC node that subscribes to filtered EKF odometry.
+   - Computes an optimal trajectory horizon considering BlueROV2 hydrodynamics (added mass, linear/quadratic drag).
+   - Solves a non-linear optimization problem to minimize the cost function (distance to target, energy, thruster smoothness).
+
+2. **`mpc_controller_bluerov`**:
+   - A theoretical MPC version relying on perfect ground-truth odometry from Gazebo (`/odom`). Used primarily for baseline testing and tuning the mathematical model.
+
+3. **`station_keeping`**: 
+   - A robust Proportional-Derivative (PD) controller.
+   - Calculates the error between the current position/yaw and a fixed target.
+   - Uses a Moore-Penrose pseudo-inverse Thruster Allocation Matrix (TAM) to map the desired 6-DOF wrench to the 8 thrusters.
+
+### Subscribed Topics
+- `/odometry/filtered` (`nav_msgs/Odometry`): Robust state estimation from the EKF.
+- `/odom` (`nav_msgs/Odometry`): Exact Gazebo ground-truth odometry (for theoretical models/debugging).
+- `/cmd_setpoint` (`geometry_msgs/PoseStamped`): The target position and orientation.
+
+### Published Topics
+- `/cmd_vel_[1-8]` (`std_msgs/Float64`): Individual force commands (or angular velocities) sent to the 8 thrusters.
+- `/mpc_tracking_error` (`std_msgs/Float64MultiArray`): Tracking error telemetry for Foxglove analysis.
+
+---
+
+## 4. Maintenance Guide
+
+If you are a developer researching or modifying the MPC controllers:
+
+- **Tuning the MPC**: The behavior of the MPC (aggressiveness vs. smoothness) is entirely dictated by the cost function in the `setup_mpc()` methods. To make the robot strictly hold an angle, increase the `yaw_err` penalty. To save energy, increase the penalty on `u_vec_cost`.
+- **Modifying the Robot Physics**: If you change the robot's physical frame or add heavy sensors, you must update the `mass_body`, added mass coefficients, and the Thruster Allocation Matrix (TAM) hardcoded in the scripts.
+- **Handling Constraints**: If the MPC solver fails or takes too long (>250ms), try relaxing the non-linear constraints (e.g., maximum pitch/roll torques) or increasing the solver tolerances (`ipopt.tol`).

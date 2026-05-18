@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/world', ['world/Bassin_ntnu.xml', 'world/Bassin_ntnu_waves.xml', 'world/ocean_40m.xml', 'world/small_net.xml', 'world/small_net_deforme.xml', 'world/small_net_current.xml']),
+        ('share/' + package_name + '/world', ['world/Bassin_ntnu.xml', 'world/Bassin_ntnu_waves.xml', 'world/ocean_40m.xml', 'world/small_net.xml', 'world/small_net_deforme.xml', 'world/small_net_current.xml', 'world/small_flexible_net.xml']),
         ('share/' + package_name + '/urdf', ['urdf/BlueROV2.urdf.xml', 'urdf/BlueROV2captors.urdf.xml', 'urdf/Bluerov2_realistic.urdf.xml']),
         ('share/' + package_name + '/launch', ['launch/bluerov2_bassin.launch.py', 'launch/bluerov2_bassin_captors.launch.py', 'launch/bluerov2_bassin_waves.launch.py', 'launch/bluerov2_ocean_realistic.launch.py', 'launch/bluerov2_realist_bassin.launch.py']),
         ('share/' + package_name + '/meshes/bluerov2', [
@@ -28,6 +28,10 @@ setup(
         ('share/' + package_name + '/models/fish_net/meshes', [
             'models/fish_net/meshes/fish_net.fbx',
             'models/fish_net/meshes/deforme.obj'    
+        ]),
+        ('share/' + package_name + '/models/flexible_net', [
+            'models/flexible_net/model.sdf',
+            'models/flexible_net/model.config'
         ]),
     ],
     install_requires=['setuptools'],

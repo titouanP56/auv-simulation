@@ -1,41 +1,10 @@
-"""
-phase3_inspection.py
-=====================
-AUV Net Inspection — Phase 3: Reactive 360° Wall-Following Orbit
 
-Strategy
---------
-  * Waits for /mission/phase2_done → True
-  * Performs a full 360° lap at constant depth (TARGET_DEPTH = -2.0 m)
-  * Maintains STANDOFF_DIST = 1.5 m from the net using the Sonoptix sonar
-    without any pre-computed trajectory.
-
-Control axes (body frame)
-  Fz  – depth PID
-  Fx  – constant forward surge (orbit speed)
-  Fy  – sway PID to regulate sonar distance (wall following)
-  Mz  – yaw PID to keep robot tangent to the net
-
-Sonar robustness
-  • Rejects points outside [SONAR_MIN_RANGE, SONAR_MAX_RANGE]
-  • Rejects low-intensity points (if intensity field available)
-  • Uses the mean of the 10 % closest valid points as wall distance estimate
-  • Moving-median filter (window = MEDIAN_WINDOW) on history of estimates
-  • Spike rejection: ignores jumps > SPIKE_THRESHOLD m between cycles
-
-Lap completion
-  • Tracks cumulative yaw integrated from odometry (no GPS)
-  • When |cumulative_yaw| ≥ 2π the lap is declared complete
-  • Publishes True on /mission/phase3_done
-
-State machine
-  WAITING → WALKING_THE_NET → LOST_WALL → LAP_COMPLETED
-"""
 
 import math
 import struct
 import collections
 import numpy as np
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -47,32 +16,28 @@ from sensor_msgs.msg import PointCloud2
 from geometry_msgs.msg import PoseStamped, Wrench
 import tf2_ros
 
-# ── Physical constants (identical to net_approach.py) ─────────────────────────
+# ── Physical constants ─────────────────────────
 
 TARGET_DEPTH          = -2.0   
 STANDOFF_DIST         = 1.5    
 CONTROL_RATE_HZ       = 20.0   
 
-# Gains optimisés pour la stabilité et la réactivité
-KP_DEPTH              = 20.0
+KP_DEPTH              = 10.0
 KI_DEPTH              = 0.2
-KD_DEPTH              = 5.0
+KD_DEPTH              = 0.2
 BUOYANCY_COMP         = 3.0    
 
-# PID Distance (Fx - Surge) : Maintient le robot à 1.5m
 KP_DIST               = 12.0
 KI_DIST               = 0.2
 KD_DIST               = 1.0
 
-# PID Vitesse Latérale (Fy - Sway) : Pour atteindre 0.2 m/s malgré la traînée
 KP_VEL_SWAY           = 40.0
 KI_VEL_SWAY           = 2.0
 KD_VEL_SWAY           = 0.5
 
-# PID Alignement (Mz - Yaw) : Verrouillage sur le point le plus proche
 KP_YAW                = 10.0
 KI_YAW                = 0.02
-KD_YAW                = 3.0  # Damping augmenté pour éviter les oscillations
+KD_YAW                = 3.0 
 
 KP_PITCH              = 10.0
 KI_PITCH              = 0.2
@@ -83,21 +48,19 @@ MAX_DIST_CMD          = 15.0
 MAX_YAW_CMD           = 20.0   
 MAX_INDIVIDUAL_THRUST = 40.0   
 
-ORBIT_DIRECTION       = 1  # 1: CCW, -1: CW
-PERCENTILE_FRACTION   = 0.10 #
-MEDIAN_WINDOW         = 7      # moving-median filter size [cycles]
-SPIKE_THRESHOLD       = 0.5    # [m]   max allowed jump per cycle
+ORBIT_DIRECTION       = 1  
+PERCENTILE_FRACTION   = 0.10 
+MEDIAN_WINDOW         = 7      
+SPIKE_THRESHOLD       = 0.5    
 
-# Lost-wall recovery
+LAP_YAW_THRESHOLD     = 2.0 * math.pi  
+LAP_START_DELAY       = 2.0             
+LOST_WALL_TIMEOUT     = 2.0             
+LOST_WALL_GRACE_S     = 2.0             
+RECOVERY_YAW_CMD      = 4.0 
 
-LAP_YAW_THRESHOLD     = 2.0 * math.pi   # Un tour complet
-LAP_START_DELAY       = 2.0             # Délai de sécurité au début (en secondes)
-LOST_WALL_TIMEOUT     = 2.0             # Temps avant de déclarer le mur "perdu"
-LOST_WALL_GRACE_S     = 2.0             # Délai de grâce au lancement
-RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter le tour (yaw)
-
-DEPTH_STEP            = 0.5             # Incrément de profondeur pour chaque palier
-FINAL_DEPTH_LIMIT     = -6.0            # Profondeur finale d'arrêt de la mission
+DEPTH_STEP            = 0.5             
+FINAL_DEPTH_LIMIT     = -6.0            
 
 
 # ── State labels ───────────────────────────────────────────────────────────────
@@ -172,8 +135,8 @@ class PID:
 
 def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float | None, float | None]:
     """
-    Extrait la distance ET l'angle du point le plus proche pour la perpendicularité.
-    Extrait aussi les distances médianes HAUT et BAS pour l'asservissement de normale (Pitch).
+    Extracts the distance AND the angle of the closest point for perpendicular alignment.
+    Also extracts the median distances TOP and BOTTOM for normal control (Pitch).
     """
     field_map = {f.name: f for f in msg.fields}
     if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
@@ -197,7 +160,6 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
         if not (math.isfinite(px) and math.isfinite(py) and math.isfinite(pz)):
             continue
 
-        # Filtrage Boresight large (90°) pour ne pas perdre le filet
         angle = math.atan2(py, px)
         dist = math.sqrt(px**2 + py**2 + pz**2)
 
@@ -213,10 +175,8 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     if not valid_points:
         return None, 0.0, None, None
 
-    # TRI PAR DISTANCE : On veut s'aligner sur la partie la plus proche
     valid_points.sort(key=lambda p: p[0])
     
-    # On prend les 10% les plus proches
     n_use = max(1, int(len(valid_points) * PERCENTILE_FRACTION))
     closest_points = valid_points[:n_use]
 
@@ -242,10 +202,12 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
 
 class Phase3InspectionNode(Node):
     """
-    Phase 3 — Reactive 360° wall-following inspection.
-
-    Activated by /mission/phase2_done.  Publishes /mission/phase3_done
-    after one complete orbit detected by cumulative yaw integration.
+    ROS 2 Node for the Inspection Phase (Phase 3) of the AUV mission.
+    
+    This node controls the robot to orbit ("walk") along the net surface at a fixed 
+    standoff distance and depth. It uses PID controllers to maintain depth, distance, 
+    sway velocity, yaw, and pitch based on Sonoptix sonar data. It tracks the 
+    completed laps and can transition to cone mode when reaching the bottom of the net.
     """
 
     def __init__(self):
@@ -264,7 +226,7 @@ class Phase3InspectionNode(Node):
         self.create_subscription(
             PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos
         )
-        # Changed to VOLATILE so tools like Foxglove and ros2 topic pub can trigger it reliably
+
         latching_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
@@ -282,92 +244,86 @@ class Phase3InspectionNode(Node):
         self.phase_pub       = self.create_publisher(String, '/mission/phase', 10)
 
         # ── Diagnostic topics (Foxglove) ─────────────────────────────────────
-        # Distance au filet
         self.wall_dist_pub       = self.create_publisher(Float64, '/phase3/wall_distance',    10)
         self.wall_dist_error_pub = self.create_publisher(Float64, '/phase3/wall_dist_error',  10)
-        # Profondeur
-        self.depth_pub           = self.create_publisher(Float64, '/phase3/depth',            10)
-        self.depth_error_pub     = self.create_publisher(Float64, '/phase3/depth_error',      10)
-        # Cap (yaw)
+
         self.yaw_pub             = self.create_publisher(Float64, '/phase3/yaw',              10)
         self.yaw_error_pub       = self.create_publisher(Float64, '/phase3/yaw_error',        10)
-        # Efforts de commande pré-TAM
+
+        self.depth_pub           = self.create_publisher(Float64, '/phase3/depth',            10)
+        self.depth_error_pub     = self.create_publisher(Float64, '/phase3/depth_error',      10)
+
         self.cmd_fx_pub          = self.create_publisher(Float64, '/phase3/cmd_Fx',           10)
         self.cmd_fy_pub          = self.create_publisher(Float64, '/phase3/cmd_Fy',           10)
         self.cmd_fz_pub          = self.create_publisher(Float64, '/phase3/cmd_Fz',           10)
         self.cmd_mz_pub          = self.create_publisher(Float64, '/phase3/cmd_Mz',           10)
         self.cmd_my_pub          = self.create_publisher(Float64, '/phase3/cmd_My',           10)
-        # Yaw cumulé (progression du tour)
+        
         self.yaw_accum_pub       = self.create_publisher(Float64, '/phase3/yaw_accumulated',  10)
         self.current_radius_pub  = self.create_publisher(Float64, '/phase3/current_radius',   10)
         self.r_ref_pub           = self.create_publisher(Float64, '/phase3/r_ref',            10)
-        self.walking_time_pub    = self.create_publisher(Float64, '/phase3/walking_time',     10)
         self.accumulated_dist_pub = self.create_publisher(Float64, '/phase3/accumulated_dist', 10)
+        self.walking_time_pub    = self.create_publisher(Float64, '/phase3/walking_time',     10)
+
+        self.real_time_elapsed_pub = self.create_publisher(Float64, '/phase3/real_time_elapsed', 10)
+        self.sim_time_elapsed_pub  = self.create_publisher(Float64, '/phase3/sim_time_elapsed',  10)
+        self.rtf_pub               = self.create_publisher(Float64, '/phase3/real_time_factor', 10)
 
         # ── TF2 & Relative Télémétrie ─────────────────────────────────────────
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.relative_pose_pub = self.create_publisher(PoseStamped, '/phase3/relative_pose', 10)
 
-        # ── Internal state ───────────────────────────────────────────────────
-
-        # Mission state
         self.state: str = State.WAITING
 
-        # Odometry
         self._have_odom = False
         self.current_z   = 0.0
         self.current_yaw = 0.0
         self.current_vyaw = 0.0
-        self.current_vy  = 0.0    # lateral sway velocity (body y)
+        self.current_vy  = 0.0
 
-        self.target_depth = TARGET_DEPTH  # Set initial depth target
+        self.target_depth = TARGET_DEPTH
 
-        # Sonar
-        self._raw_net_range: float | None = None   # latest raw estimate this cycle
-        self.net_range: float | None = None         # filtered estimate
-        self._prev_net_range: float | None = None   # for spike rejection
+        self._raw_net_range: float | None = None 
+        self.net_range: float | None = None        
+        self._prev_net_range: float | None = None
         self._sonar_median = MovingMedian(MEDIAN_WINDOW)
         self._last_sonar_time: float | None = None
         self.net_angle_error: float = 0.0
         self.dist_top: float | None = None
         self.dist_bottom: float | None = None
 
-        # Cone and Radius Tracking
         self.in_cone_mode = False
         self.cone_transition_start_time = None
         self.apex_condition_start_time = None
         self.R_ref = None
         self.radius_samples = []
 
-        # PID controllers
         self._pid_depth = PID(KP_DEPTH, KI_DEPTH, KD_DEPTH, integral_limit=50.0)
         self._pid_dist  = PID(KP_DIST,  KI_DIST,  KD_DIST,  integral_limit=10.0)
         self._pid_yaw   = PID(KP_YAW,   KI_YAW,   KD_YAW,   integral_limit=10.0)
         self._pid_pitch = PID(KP_PITCH, KI_PITCH, KD_PITCH, integral_limit=10.0)
-        
         self._pid_velocity_sway = PID(15.0, 0.5, 0.0, integral_limit=20.0)
 
         self._last_fx = 0.0
 
-        # Yaw-accumulation for lap tracking
         self._start_yaw: float | None = None
         self._prev_yaw: float | None = None
         self._accumulated_yaw = 0.0
         self._lap_start_time: float | None = None
-        self._walking_start_time: float | None = None  # set when WALKING_THE_NET begins
-        self._first_walking_start_time: float | None = None  # absolute start of WALKING_THE_NET
-        self._accumulated_walking_time = 0.0  # active time spent in WALKING_THE_NET
+        self._walking_start_time: float | None = None
+        self._first_walking_start_time: float | None = None
+        self._accumulated_walking_time = 0.0
         self._accumulated_dist = 0.0
         self._last_R_calculated = 0.0
 
-        # Timing
         self._dt = 1.0 / CONTROL_RATE_HZ
         self._last_loop_time: float | None = None
-
-        # Yaw target for tracing the circle (center-facing)
         self._target_yaw: float | None = None   # Updated continuously using DVL lateral velocity
         self._yaw_error_prev = 0.0
+
+        self._start_real_time = time.time()
+        self._start_sim_time  = self.get_clock().now().nanoseconds * 1e-9
 
         # ── Control timer ────────────────────────────────────────────────────
         self.create_timer(self._dt, self._control_loop)
@@ -383,31 +339,23 @@ class Phase3InspectionNode(Node):
         self._have_odom   = True
 
     def _sonoptix_cb(self, msg: PointCloud2):
-        """Process Sonoptix PointCloud2 with full robustness pipeline.
-        Accepted in WALKING_THE_NET and LOST_WALL states only.
-        """
         if self.state not in (State.WALKING_THE_NET, State.LOST_WALL):
             return
 
         raw, angle, dist_top, dist_bottom = _extract_wall_distance(msg)
         if raw is None:
-            # We explicitly update the timestamp anyway, because receiving
-            # an "empty" pointcloud proves the sensor is alive, just seeing nothing.
-            # (Allows robot to keep swaying to find the net rather than aborting)
             self.get_logger().debug("[SONAR] Valid frame received but yielded None")
             self._last_sonar_time = self.get_clock().now().nanoseconds * 1e-9
             return
 
-        # ── 1. Spike rejection ────────────────────────────────────────────
         if self._prev_net_range is not None:
             jump = abs(raw - self._prev_net_range)
             if jump > SPIKE_THRESHOLD:
                 self.get_logger().debug(
                     f"[SONAR] Spike rejected: {raw:.3f}m (prev={self._prev_net_range:.3f}m, Δ={jump:.3f}m)"
                 )
-                raw = self._prev_net_range  # keep previous value
+                raw = self._prev_net_range
 
-        # ── 2. Moving-median filter ───────────────────────────────────────
         filtered = self._sonar_median.update(raw)
 
         self._prev_net_range = filtered
@@ -423,12 +371,10 @@ class Phase3InspectionNode(Node):
             self.state = State.WALKING_THE_NET
             self._walking_start_time = self.get_clock().now().nanoseconds * 1e-9
             self._first_walking_start_time = self._walking_start_time
-            # Reset sonar history so stale Phase-2 timestamps don't cause
-            # an immediate sonar_age > LOST_WALL_TIMEOUT at the first loop cycle.
             self._last_sonar_time = None
             self._raw_net_range   = None
             self._prev_net_range  = None
-            self._sonar_median    = MovingMedian(MEDIAN_WINDOW)  # fresh filter
+            self._sonar_median    = MovingMedian(MEDIAN_WINDOW)
 
     # ── Control loop ──────────────────────────────────────────────────────────
 
@@ -437,19 +383,34 @@ class Phase3InspectionNode(Node):
             return
 
         now = self.get_clock().now().nanoseconds * 1e-9
-        dt = self._dt  # nominal; use fixed rate for PID stability
+        dt = self._dt
         if self._last_loop_time is not None:
             real_dt = now - self._last_loop_time
             if 0.005 < real_dt < 0.5:
                 dt = real_dt
         self._last_loop_time = now
 
-        # Publish phase label
+        # ── Real-time vs Simulation-time metrics ─────────────────────────────
+        real_elapsed = time.time() - self._start_real_time
+        sim_elapsed  = now - self._start_sim_time
+        
+        re_msg = Float64()
+        re_msg.data = real_elapsed
+        self.real_time_elapsed_pub.publish(re_msg)
+
+        se_msg = Float64()
+        se_msg.data = sim_elapsed
+        self.sim_time_elapsed_pub.publish(se_msg)
+
+        if real_elapsed > 0:
+            rtf_msg = Float64()
+            rtf_msg.data = sim_elapsed / real_elapsed
+            self.rtf_pub.publish(rtf_msg)
+
         phase_msg = String()
         phase_msg.data = self.state
         self.phase_pub.publish(phase_msg)
 
-        # ── Relative Télémétrie ───────────────────────────────────────────
         try:
             t = self.tf_buffer.lookup_transform(
                 'local_origin', 'base_link', rclpy.time.Time()
@@ -463,9 +424,8 @@ class Phase3InspectionNode(Node):
             pose_msg.pose.orientation = t.transform.rotation
             self.relative_pose_pub.publish(pose_msg)
         except tf2_ros.TransformException:
-            pass  # Fail silently if the transform isn't available yet
+            pass
 
-        # ── State dispatch ────────────────────────────────────────────────
         if self.state == State.WAITING:
             return
 
@@ -473,40 +433,30 @@ class Phase3InspectionNode(Node):
             done_msg = Bool()
             done_msg.data = True
             self.phase3_done_pub.publish(done_msg)
-            # Maintient la profondeur cible même une fois complété
             depth_error = self.target_depth - self.current_z
             fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
             Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
             self._publish_thrusters(0.0, 0.0, Fz, 0.0, 0.0)
             return
 
-        # ── Yaw-accumulation for lap tracking ─────────────────────────────
         if self._start_yaw is None:
-            # First active cycle: initialise lap tracking
             self._start_yaw    = self.current_yaw
             self._prev_yaw     = self.current_yaw
             self._accumulated_yaw = 0.0
             self._lap_start_time  = now
-            # In Strafing mode, the robot starts already facing the net.
             self._target_yaw = self.current_yaw
             self.get_logger().info(
                 f"[WALKING_THE_NET] Strafing mode (lap tracking) initialised at yaw={math.degrees(self._start_yaw):.1f}°"
             )
         else:
-            # Integrate yaw delta
             delta = _angle_diff(self.current_yaw, self._prev_yaw)
-            # Filter tiny numerical noise
             if abs(delta) > math.radians(0.05):
                 self._accumulated_yaw += delta
             self._prev_yaw = self.current_yaw
 
-        # Publish accumulated yaw for monitoring
         yaw_acc_msg = Float64()
         yaw_acc_msg.data = self._accumulated_yaw
         self.yaw_accum_pub.publish(yaw_acc_msg)
-
-        # ── Radius Tracking and Cone Transition ───────────────────────────
-        # Intégration de la distance latérale parcourue
         self._accumulated_dist += abs(self.current_vy) * dt
 
         acc_dist_msg = Float64()
@@ -518,7 +468,7 @@ class Phase3InspectionNode(Node):
         elif self._last_R_calculated > 0.0:
             current_radius = self._last_R_calculated
         else:
-            current_radius = 10.0  # Safe large value initially
+            current_radius = 5.0
 
         radius_msg = Float64()
         radius_msg.data = current_radius
@@ -538,7 +488,7 @@ class Phase3InspectionNode(Node):
                         self.radius_samples.append(current_radius)
                 elif self.radius_samples:
                     self.R_ref = float(np.mean(self.radius_samples))
-                    self.get_logger().info(f"[PHASE3] R_ref calculated: {self.R_ref:.2f} m (moyenne sur les {len(self.radius_samples)} échantillons des 30 premières secondes actives).")
+                    self.get_logger().info(f"[PHASE3] R_ref calculated: {self.R_ref:.2f} m (average over {len(self.radius_samples)} samples from the first 30 active seconds).")
 
             if self.R_ref is not None and not self.in_cone_mode:
                 if current_radius < 0.9 * self.R_ref:
@@ -546,17 +496,16 @@ class Phase3InspectionNode(Node):
                         self.cone_transition_start_time = now
                     elif now - self.cone_transition_start_time > 3.0:
                         self.in_cone_mode = True
-                        self.get_logger().info("Transition Cône détectée")
+                        self.get_logger().info("Cone transition detected")
                 else:
                     self.cone_transition_start_time = None
 
-            # Condition d'Arrêt Global (Apex) avec persistance de 5 secondes
             if self.in_cone_mode:
                 if current_radius < 1.0:
                     if self.apex_condition_start_time is None:
                         self.apex_condition_start_time = now
                     elif now - self.apex_condition_start_time > 5.0:
-                        self.get_logger().info("Apex atteint et stable (rayon < 1m pendant 5s). Fin de la mission et remontée.")
+                        self.get_logger().info("Apex reached and stable (radius < 1m for 5s). Ending mission and ascending.")
                         self.state = State.LAP_COMPLETED
                         self.target_depth = -2.0
                 else:
@@ -567,7 +516,6 @@ class Phase3InspectionNode(Node):
             r_ref_msg.data = self.R_ref
             self.r_ref_pub.publish(r_ref_msg)
 
-        # ── Evaluate sonar availability ────────────────────────────────────
         sonar_age = (
             now - self._last_sonar_time
             if self._last_sonar_time is not None
@@ -576,15 +524,11 @@ class Phase3InspectionNode(Node):
         sonar_ok = sonar_age < LOST_WALL_TIMEOUT and self._raw_net_range is not None
         self.net_range = self._raw_net_range if sonar_ok else None
 
-        # Publish wall distance diagnostic
         if self.net_range is not None:
             wd_msg = Float64()
             wd_msg.data = self.net_range
             self.wall_dist_pub.publish(wd_msg)
 
-        # ── State transition: WALKING ↔ LOST_WALL ─────────────────────────
-        # Startup grace: do not trigger LOST_WALL until sonar has had time to
-        # deliver the first frame (avoids immediate LOST_WALL on activation).
         walking_age = (
             now - self._walking_start_time
             if self._walking_start_time is not None
@@ -602,38 +546,33 @@ class Phase3InspectionNode(Node):
         elif self.state == State.LOST_WALL and sonar_ok:
             self.get_logger().info("[WALKING_THE_NET] Sonar recovered — resuming orbit.")
             self.state = State.WALKING_THE_NET
-            self._walking_start_time = now  # reset grace for the resumed phase
-
-        # ── Compute control commands ───────────────────────────────────────
+            self._walking_start_time = now  
+            
         if self.state == State.LOST_WALL:
             self._do_lost_wall(dt)
         else:
             self._do_walking(dt)
 
-        # ── Lap completion check ───────────────────────────────────────────
         elapsed_since_start = now - self._lap_start_time if self._lap_start_time else 0.0
         if (elapsed_since_start > LAP_START_DELAY
                 and abs(self._accumulated_yaw) >= LAP_YAW_THRESHOLD):
-            
-            # Calcul final du rayon pour ce tour complet
+
             self._last_R_calculated = self._accumulated_dist / (2 * math.pi)
             
             self.get_logger().info(
                 f"[LAP_COMPLETED] Full orbit done at depth {self.target_depth}! "
                 f"Accumulated yaw: {math.degrees(self._accumulated_yaw):.1f}°, "
-                f"Rayon calculé: {self._last_R_calculated:.2f}m"
+                f"Calculated radius: {self._last_R_calculated:.2f}m"
             )
             
             self._accumulated_dist = 0.0
             
-            # Check if we can descend to a new plateau
             if self.target_depth - DEPTH_STEP + 0.01 >= FINAL_DEPTH_LIMIT:
-                # Adding +0.01 margin to avoid floating point issues (e.g. -2.0 - 4.0 = -6.0 >= -6.0)
                 self.target_depth -= DEPTH_STEP
                 self._accumulated_yaw = 0.0
-                self._lap_start_time = now # reset delay to avoid immediate re-trigger
-                self.apex_condition_start_time = None  # reset apex timer on new level
-                cone_status = " (mode Cône maintenu)" if self.in_cone_mode else ""
+                self._lap_start_time = now
+                self.apex_condition_start_time = None
+                cone_status = " (Cone mode maintained)" if self.in_cone_mode else ""
                 self.get_logger().info(f"[DESCENDING] New target depth: {self.target_depth}{cone_status}")
             else:
                 self.state = State.LAP_COMPLETED
@@ -645,15 +584,11 @@ class Phase3InspectionNode(Node):
     # ── Walking state ─────────────────────────────────────────────────────────
 
     def _do_walking(self, dt: float):
-        """
-        Calcul des commandes pour l'inspection frontale.
-        """
-        # 1. Profondeur (Fz)
+
         depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 
-        # 2. Distance au filet (Fx - Surge) : Robot face au filet
         if self.net_range is not None:
             dist_error = self.net_range - STANDOFF_DIST
             Fx = float(np.clip(self._pid_dist.compute(dist_error, dt), -MAX_DIST_CMD, MAX_DIST_CMD))
@@ -661,34 +596,23 @@ class Phase3InspectionNode(Node):
         else:
             Fx = self._last_fx
 
-        # 3. Vitesse de progression (Fy - Sway) : Objectif 0.2 m/s
-        # On ne bouge latéralement que si la profondeur est atteinte (marge de 15cm)
         if abs(depth_error) < 0.15:
             target_vy = float(ORBIT_DIRECTION * 0.25)
             vy_error = target_vy - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
         else:
-            # On descend sans progresser autour du filet, pour ne pas dévier de la trajectoire idéale
             sway_vel_error = 0.0 - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
-            
-            # On empêche de compter ce tour en réinitialisant le délai
-            # (Pour utiliser l'horloge de façon propre on peut stocker le temps mais "reset" le yaw)
-            
-
-        # 4. Perpendicularité (Mz - Yaw) : S'aligner sur l'angle des points les plus proches
-        # net_angle_error est maintenant l'angle moyen des points proches uniquement
+        
         yaw_error = self.net_angle_error
         Mz = float(np.clip(self._pid_yaw.compute(yaw_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
 
-        # 5. Asservissement de Normale (My - Pitch) : Rester perpendiculaire à la pente du filet
         if self.in_cone_mode and self.dist_top is not None and self.dist_bottom is not None:
             pitch_error = self.dist_top - self.dist_bottom
             My = float(np.clip(self._pid_pitch.compute(pitch_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
         else:
             My = 0.0
 
-        # 6. Priorisation
         total_cmd = abs(Fx) + abs(Fz) + abs(Mz) + abs(My)
         if total_cmd + abs(Fy) > MAX_INDIVIDUAL_THRUST:
             max_fy = max(0.0, MAX_INDIVIDUAL_THRUST - total_cmd)
@@ -700,19 +624,13 @@ class Phase3InspectionNode(Node):
                                   yaw_error, My)
 
     def _do_lost_wall(self, dt: float):
-        """
-        En cas de perte du filet : on arrête la progression latérale et on pivote
-        doucement pour retrouver la paroi avec le sonar frontal.
-        """
         depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 
-        # Freinage actif sur la vitesse latérale
         sway_vel_error = 0.0 - self.current_vy
         Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
 
-        # Rotation de recherche
         Mz = float(ORBIT_DIRECTION * RECOVERY_YAW_CMD)
 
         self._publish_thrusters(0.0, Fy, Fz, Mz, 0.0)
@@ -728,26 +646,19 @@ class Phase3InspectionNode(Node):
         yaw_error: float,
         My: float = 0.0
     ):
-        """Publish all Foxglove monitoring topics in one call."""
         def _pub(publisher, value: float):
             m = Float64()
             m.data = float(value)
             publisher.publish(m)
 
-        # Distance au filet
         if self.net_range is not None:
             _pub(self.wall_dist_pub,       self.net_range)
-            _pub(self.wall_dist_error_pub, dist_error)          # net_range − 1.5 m
-
-        # Profondeur
+            _pub(self.wall_dist_error_pub, dist_error)
         _pub(self.depth_pub,       self.current_z)
-        _pub(self.depth_error_pub, depth_error)                 # TARGET_DEPTH − current_z
-
-        # Cap (yaw)
+        _pub(self.depth_error_pub, depth_error)
         _pub(self.yaw_pub,         self.current_yaw)
-        _pub(self.yaw_error_pub,   yaw_error)                   # tangent_yaw − current_yaw [rad]
+        _pub(self.yaw_error_pub,   yaw_error)
 
-        # Efforts de commande pré-TAM
         _pub(self.cmd_fx_pub, Fx)
         _pub(self.cmd_fy_pub, Fy)
         _pub(self.cmd_fz_pub, Fz)

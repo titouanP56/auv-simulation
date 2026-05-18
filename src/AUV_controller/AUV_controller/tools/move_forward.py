@@ -52,7 +52,7 @@ class MoveForwardNode(Node):
             return
             
         elapsed = current_sec - self.start_time
-        self.get_logger().info(f"[Gazebo Time] La simulation tourne depuis : {elapsed:.1f} secondes")
+        self.get_logger().info(f"[Gazebo Time] Simulation has been running for: {elapsed:.1f} seconds")
 
     def publish_thrusts(self):
         """Calculates and publishes the thruster commands."""
@@ -81,7 +81,7 @@ class MoveForwardNode(Node):
         # 5N on t1, t2 and -5N on t3, t4 pushes the robot forward
         cmd = [-5, 5, -5, 5, 0.0, 0.0, 0.0, 0.0]
         
-        self.get_logger().info(f"Poussée globale : {current_F_surge:.1f} N | T1-T4 : {t1:.1f} N")
+        self.get_logger().info(f"Global Thrust: {current_F_surge:.1f} N | T1-T4: {t1:.1f} N")
 
         for i in range(8):
             desired_force = float(cmd[i])

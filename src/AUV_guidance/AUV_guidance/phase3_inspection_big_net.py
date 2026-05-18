@@ -53,26 +53,26 @@ TARGET_DEPTH          = -2.0
 STANDOFF_DIST         = 1.5    
 CONTROL_RATE_HZ       = 20.0   
 
-# Gains optimisés pour la stabilité et la réactivité
+# Optimized gains for stability and reactivity
 KP_DEPTH              = 20.0
 KI_DEPTH              = 0.2
 KD_DEPTH              = 20.0
 BUOYANCY_COMP         = 3.0    
 
-# PID Distance (Fx - Surge) : Maintient le robot à 1.5m
+# Distance PID (Fx - Surge): Maintains the robot at 1.5m
 KP_DIST               = 12.0
 KI_DIST               = 0.2
 KD_DIST               = 1.0
 
-# PID Vitesse Latérale (Fy - Sway) : Pour atteindre 0.2 m/s malgré la traînée
+# Lateral Velocity PID (Fy - Sway): Target 0.2 m/s despite drag
 KP_VEL_SWAY           = 40.0
 KI_VEL_SWAY           = 2.0
 KD_VEL_SWAY           = 0.5
 
-# PID Alignement (Mz - Yaw) : Verrouillage sur le point le plus proche
+# Alignment PID (Mz - Yaw): Lock onto the closest point
 KP_YAW                = 10.0
 KI_YAW                = 0.02
-KD_YAW                = 3.0  # Damping augmenté pour éviter les oscillations
+KD_YAW                = 3.0  # Increased damping to avoid oscillations
 
 MAX_DEPTH_CMD         = 15.0   
 MAX_DIST_CMD          = 15.0   
@@ -86,14 +86,14 @@ SPIKE_THRESHOLD       = 0.5    # [m]   max allowed jump per cycle
 
 # Lost-wall recovery
 
-LAP_YAW_THRESHOLD     = 2.0 * math.pi   # Un tour complet
-LAP_START_DELAY       = 2.0             # Délai de sécurité au début (en secondes)
-LOST_WALL_TIMEOUT     = 2.0             # Temps avant de déclarer le mur "perdu"
-LOST_WALL_GRACE_S     = 2.0             # Délai de grâce au lancement
-RECOVERY_YAW_CMD      = 4.0 # [s] Temps d'attente avant de commencer à compter le tour (yaw)
+LAP_YAW_THRESHOLD     = 2.0 * math.pi   # One full lap
+LAP_START_DELAY       = 2.0             # Safety delay at start (seconds)
+LOST_WALL_TIMEOUT     = 2.0             # Time before declaring wall "lost"
+LOST_WALL_GRACE_S     = 2.0             # Grace period at launch
+RECOVERY_YAW_CMD      = 4.0             # Wait time before counting yaw
 
-DEPTH_STEP            = 0.5             # Incrément de profondeur pour chaque palier
-FINAL_DEPTH_LIMIT     = -29.5            # Profondeur finale d'arrêt de la mission
+DEPTH_STEP            = 0.5             # Depth increment for each step
+FINAL_DEPTH_LIMIT     = -29.5           # Final depth to stop the mission
 
 # ── Thruster allocation (identical to net_approach.py) ────────────────────────
 
@@ -184,7 +184,7 @@ class PID:
 
 def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float]:
     """
-    Extrait la distance ET l'angle du point le plus proche pour la perpendicularité.
+    Extracts the distance AND the angle of the closest point for perpendicular alignment.
     """
     field_map = {f.name: f for f in msg.fields}
     if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
@@ -206,7 +206,7 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float]:
         if not (math.isfinite(px) and math.isfinite(py) and math.isfinite(pz)):
             continue
 
-        # Filtrage Boresight large (90°) pour ne pas perdre le filet
+        # Wide Boresight filtering (90°) to avoid losing the net
         angle = math.atan2(py, px)
         dist = math.sqrt(px**2 + py**2 + pz**2)
 
@@ -218,10 +218,10 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float]:
     if not valid_points:
         return None, 0.0
 
-    # TRI PAR DISTANCE : On veut s'aligner sur la partie la plus proche
+    # SORT BY DISTANCE: We want to align with the closest part
     valid_points.sort(key=lambda p: p[0])
     
-    # On prend les 10% les plus proches
+    # We take the closest 10%
     n_use = max(1, int(len(valid_points) * PERCENTILE_FRACTION))
     closest_points = valid_points[:n_use]
 
@@ -545,14 +545,14 @@ class Phase3InspectionNode(Node):
 
     def _do_walking(self, dt: float):
         """
-        Calcul des commandes pour l'inspection frontale.
+        Calculation of commands for frontal inspection.
         """
-        # 1. Profondeur (Fz)
+        # 1. Depth (Fz)
         depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 
-        # 2. Distance au filet (Fx - Surge) : Robot face au filet
+        # 2. Distance to net (Fx - Surge): Robot facing the net
         if self.net_range is not None:
             dist_error = self.net_range - STANDOFF_DIST
             Fx = float(np.clip(self._pid_dist.compute(dist_error, dt), -MAX_DIST_CMD, MAX_DIST_CMD))
@@ -560,23 +560,20 @@ class Phase3InspectionNode(Node):
         else:
             Fx = self._last_fx
 
-        # 3. Vitesse de progression (Fy - Sway) : Objectif 0.2 m/s
-        # On ne bouge latéralement que si la profondeur est atteinte (marge de 15cm)
+        # 3. Progression speed (Fy - Sway): Target 0.2 m/s
+        # We only move laterally if depth is reached (15cm margin)
         if abs(depth_error) < 0.15:
             target_vy = float(ORBIT_DIRECTION * 0.25)
             vy_error = target_vy - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(vy_error, dt), -15.0, 15.0))
         else:
-            # On descend sans progresser autour du filet, pour ne pas dévier de la trajectoire idéale
+            # We descend without progressing around the net to avoid deviating
             sway_vel_error = 0.0 - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
             
-            # On empêche de compter ce tour en réinitialisant le délai
-            # (Pour utiliser l'horloge de façon propre on peut stocker le temps mais "reset" le yaw)
-            
 
-        # 4. Perpendicularité (Mz - Yaw) : S'aligner sur l'angle des points les plus proches
-        # net_angle_error est maintenant l'angle moyen des points proches uniquement
+        # 4. Perpendicularity (Mz - Yaw): Align on the angle of closest points
+        # net_angle_error is now the average angle of close points only
         yaw_error = self.net_angle_error
         Mz = float(np.clip(self._pid_yaw.compute(yaw_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
 
@@ -587,18 +584,18 @@ class Phase3InspectionNode(Node):
 
     def _do_lost_wall(self, dt: float):
         """
-        En cas de perte du filet : on arrête la progression latérale et on pivote
-        doucement pour retrouver la paroi avec le sonar frontal.
+        In case the net is lost: stop lateral progression and rotate
+        slowly to find the wall again with the frontal sonar.
         """
         depth_error = self.target_depth - self.current_z
         fz_raw = self._pid_depth.compute(depth_error, dt) - BUOYANCY_COMP
         Fz = float(np.clip(fz_raw, -MAX_DEPTH_CMD, MAX_DEPTH_CMD))
 
-        # Freinage actif sur la vitesse latérale
+        # Active braking on lateral velocity
         sway_vel_error = 0.0 - self.current_vy
         Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
 
-        # Rotation de recherche
+        # Search rotation
         Mz = float(ORBIT_DIRECTION * RECOVERY_YAW_CMD)
 
         self._publish_thrusters(0.0, Fy, Fz, Mz)
@@ -619,20 +616,20 @@ class Phase3InspectionNode(Node):
             m.data = float(value)
             publisher.publish(m)
 
-        # Distance au filet
+        # Wall Distance
         if self.net_range is not None:
             _pub(self.wall_dist_pub,       self.net_range)
             _pub(self.wall_dist_error_pub, dist_error)          # net_range − 1.5 m
 
-        # Profondeur
+        # Depth
         _pub(self.depth_pub,       self.current_z)
         _pub(self.depth_error_pub, depth_error)                 # TARGET_DEPTH − current_z
 
-        # Cap (yaw)
+        # Heading (yaw)
         _pub(self.yaw_pub,         self.current_yaw)
         _pub(self.yaw_error_pub,   yaw_error)                   # tangent_yaw − current_yaw [rad]
 
-        # Efforts de commande pré-TAM
+        # Command efforts pre-TAM
         _pub(self.cmd_fx_pub, Fx)
         _pub(self.cmd_fy_pub, Fy)
         _pub(self.cmd_fz_pub, Fz)

@@ -37,6 +37,14 @@ def quaternion_from_euler(ai, aj, ak):
     return q
 
 class NetLocalEstimator(Node):
+    """
+    ROS 2 Node to estimate the local pose of the net relative to the robot.
+    
+    It subscribes to the filtered Sonoptix point cloud, fits a line to the detected
+    points using Principal Component Analysis (PCA), calculates the normal vector to 
+    determine the net's orientation and distance, and publishes this as a PoseStamped
+    in the odom frame.
+    """
     def __init__(self):
         super().__init__('net_local_estimator')
         

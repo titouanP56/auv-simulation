@@ -1,44 +1,100 @@
-# AUV_guidance
+# AUV Guidance
 
-This package acts as the **Guidance** module in the `ros2_AUV` workspace. It is responsible for decision making, state machines, and generating continuous trajectories for the controllers to follow.
+## 1. Introduction for Beginners
 
-## Main Features
+Welcome to the **AUV Guidance** package! Think of this package as the "brain" of the underwater robot (AUV). 
 
-- **Mission State Machines**: High-level scripts that manage the sequence of operations for specific tasks (e.g., finding a target, approaching, and standing off).
-- **Trajectory Generation**: Continuous path planning nodes that output target poses (`/cmd_setpoint`) for the MPC or PID controllers to track.
-- **Mission Integration (Launch)**: Top-level launch files that orchestrate the startup of the simulator, the guidance nodes, and the controllers.
+While the controller moves the muscles (propellers), the guidance package decides **where** the robot should go and **what** it should look at. During a mission, this package tells the robot to dive, find the net with its sonars, approach it safely, and then orbit around it to perform an inspection. 
 
-## Main Nodes and Scripts
+This package also contains important "bridges." Since a simulated robot and a real-world robot don't always speak the exact same language, these bridges translate the brain's desired movements (like "push forward with 10 Newtons of force") into the specific commands required by either the Gazebo simulator or the real BlueROV2 hardware.
 
-### Guidance Nodes
-- **`net_approach.py`**: A state machine designed to bring the AUV from the surface down to a specific depth, scan for an underwater wall (or net) using the Ping360 sonar, approach it rapidly using Sonoptix data, and establish a standoff distance to define a new local origin before triggering the inspection via the `/mission/phase2_done` topic.
-- **`phase3_inspection.py`**: A reactive PID-based wall-following node that directly maps errors to thruster forces. It controls perpendicularity and standoff distance using filtered Sonoptix 3D point clouds (median filter, spike rejection), while using a constant lateral sway thrust to perform a 360-degree orbit. It tracks lap completion by integrating the robot's yaw and automatically descends in successive depth steps (e.g., dropping by 0.5m down to -6.0m limit).
-- **`phase3_inspection_big_net.py`**: Similar to `phase3_inspection.py` but configured for much larger and deeper environments, allowing the AUV to descend up to a depth limit of -29.5m.
-- **`sim_thruster_bridge.py`**: Bridges the gap between high-level force commands (`Wrench`) and individual thruster PWM/Float levels in Gazebo simulation.
-- **`bluerov2_bridge.py`**: Translates `Wrench` commands into MAVROS-compatible messages for real BlueROV2 hardware.
+---
 
-### Launch Files
-- **`net_full_inspection.launch.py`**: The primary mission bring-up script. Orchestrates the approach and the cyclic reactive inspection sequentially in the `small_net.xml` environment. Supports `use_hardware:=True` to switch from Gazebo to MAVROS/Hardware.
-- **`net_full_inspection_deforme.launch.py`**: Fully synchronized with the primary mission launch. Executed in the `small_net_deforme.xml` environment to test mission robustness against deformations. Also supports the `use_hardware` flag.
-- **`net_inspection_big_net.launch.py`**: Launch script for the deep `ocean_40m.xml` environment. Spawns the AUV at a 20m radius and executes the approach along with the `phase3_inspection_big_net` node.
+## 2. Quick Start Guide
 
-## Dependencies
+### Prerequisites
+Make sure your ROS 2 workspace is sourced and built.
 
-- `rclpy`, `std_msgs`, `nav_msgs`, `sensor_msgs`, `geometry_msgs`
-- `tf2_ros`
-
-## Usage
-
-**1. Launch the Full Cyclic Mission (Recommended):**
-Sequentially executes approach and multi-level reactive inspection.
 ```bash
-ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
+cd ~/AUV_project/ros2_AUV
+colcon build --packages-select AUV_guidance
+source install/setup.bash
 ```
 
-**2. Run Individual Nodes (Requires active simulation) (not recommanded):**
+### Running the Mission
+
+The full inspection mission is typically launched via a master launch file, which starts the simulation, controllers, and guidance nodes in the correct sequence.
+
+**Simulated Full Inspection:**
+To launch the complete, automated net inspection mission in simulation:
 ```bash
-ros2 run AUV_guidance net_approach
+ros2 launch AUV_guidance net_full_inspection.launch.py
 ```
+
+**Available Launch Arguments (Balises):**
+You can customize the mission execution using the following arguments (append `arg:=value` to the command):
+
+| Argument | Default | Description |
+|---|---|---|
+| `headless` | `False` | Run Gazebo in the background without the 3D graphical interface (saves GPU resources). |
+| `use_hardware` | `False` | Set to `True` to deploy on the real BlueROV2. It disables Gazebo and launches MAVROS + `bluerov2_bridge`. |
+| `rviz` | `False` | Launch RViz2 to visualize sensor data, point clouds, and TF trees. |
+| `world_file` | `small_net.xml` | Specify the Gazebo world file to load (located in `AUV_description/world/`). |
+| `gz_delay` | `8.0` | Seconds to wait for Gazebo to initialize before spawning the robot and mission nodes. |
+
+*Example:*
 ```bash
-ros2 run AUV_guidance phase3_inspection
+ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True rviz:=True use_hardware:=False
 ```
+
+**(For developers) Running specific nodes manually:**
+If you need to test the logic phases individually:
+```bash
+ros2 run AUV_guidance phase2_mission     # Starts the approach logic
+ros2 run AUV_guidance phase3_inspection  # Starts the orbiting logic
+```
+
+---
+
+## 3. Technical Architecture
+
+This package orchestrates the high-level mission state machine. It processes sonar point clouds to extract geometric features (wall distance, perpendicular angle, pitch) and computes generalized forces (Wrench) to send to the lower-level thruster bridges.
+
+### Core Nodes
+
+1. **`phase2_mission` (net_approach.py)**: 
+   - **Role**: Handles the dive and initial net approach.
+   - **Logic**: Uses a state machine (`DESCENDING`, `SCANNING`, `ALIGNING`, `APPROACHING`, `STABILIZING`, `STANDOFF`). It uses the Ping360 sonar to find the general direction of the net, aligns to it, and then uses the Sonoptix sonar to approach until exactly 1.5m away. It finally creates a `local_origin` TF frame.
+
+2. **`phase3_inspection` (phase3_inspection.py & phase3_inspection_big_net.py)**:
+   - **Role**: Executes a reactive 360° wall-following orbit around the net.
+   - **Logic**: Uses 4 simultaneous PID controllers (Depth, Distance, Lateral Speed, Yaw). It tracks the net's curvature without relying on a predefined map. It tracks laps by integrating the robot's yaw from odometry. A "LOST_WALL" recovery state is implemented in case the sonar loses track of the net.
+
+3. **`sim_thruster_bridge.py`**:
+   - **Role**: Translates a 6-DOF `Wrench` command into 8 individual `Float64` motor commands (`/cmd_vel_X`) specifically for the Gazebo plugins using a pseudo-inverse Thruster Allocation Matrix.
+
+4. **`bluerov2_bridge.py`**:
+   - **Role**: Translates a 6-DOF `Wrench` command into MAVROS `OverrideRCIn` (RC PWM signals) to control the real BlueROV2 running ArduSub.
+
+### Subscribed Topics
+- `/odometry/filtered` (`nav_msgs/Odometry`): Localization data.
+- `/ping360/scan` (`sensor_msgs/LaserScan`): 2D mechanical scanning sonar.
+- `/sonoptix/points` (`sensor_msgs/PointCloud2`): 3D multibeam imaging sonar.
+- `/auv/command_wrench` (`geometry_msgs/Wrench`): Desired body forces (used by the bridges).
+
+### Published Topics
+- `/auv/command_wrench` (`geometry_msgs/Wrench`): Output of Phase 2 and 3 nodes.
+- `/cmd_vel_[1-8]` (`std_msgs/Float64`): Simulation motor commands (sim_thruster_bridge).
+- `/mavros/rc/override` (`mavros_msgs/OverrideRCIn`): Hardware motor commands (bluerov2_bridge).
+- `/mission/phase` (`std_msgs/String`): Current state of the mission.
+
+---
+
+## 4. Maintenance Guide
+
+If you are a developer taking over this project, here is how you can modify or improve the guidance code:
+
+- **Modifying the Inspection Speed**: In `phase3_inspection.py`, find the `target_vy` variable in the `_do_walking` method. It is currently set to `0.25` m/s. Adjust this to make the robot orbit faster or slower.
+- **Adjusting the Standoff Distance**: If the robot is too close or too far from the net, change the `STANDOFF_DIST` constant (currently 1.5m) at the top of the phase scripts.
+- **Improving Wall Recovery**: If the robot frequently loses the net and struggles to find it in `LOST_WALL` state, consider tweaking the `RECOVERY_YAW_CMD` (the speed at which it rotates to search) and `LOST_WALL_TIMEOUT` parameters.
+- **Hardware vs Simulation**: When moving from Gazebo to the real pool, ensure your launch files remap the outputs correctly. You must run `bluerov2_bridge` instead of `sim_thruster_bridge`, and ensure MAVROS is properly configured.

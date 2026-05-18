@@ -1,11 +1,4 @@
-"""
-phase2_mission.py
-=================
-AUV Net Inspection — Phase 2: Descent and Edge Finding
 
-State machine:
-    DESCENDING  →  SCANNING  →  ALIGNING  →  APPROACHING  →  STANDOFF
-"""
 
 import math
 import struct
@@ -107,6 +100,14 @@ def _min_sonoptix_range(msg: PointCloud2) -> float | None:
 # ── Main Node ─────────────────────────────────────────────────────────────────
 
 class Phase2MissionNode(Node):
+    """
+    ROS 2 Node for the Approach Phase (Phase 2) of the AUV mission.
+    
+    This node controls the robot to dive to a target depth, scan the environment 
+    using a Ping360 sonar to find the net, align with it, and approach it until
+    a specific standoff distance is reached (using a Sonoptix sonar). Finally, 
+    it establishes a local coordinate frame (origin) for the next phase.
+    """
     def __init__(self):
         super().__init__('phase2_mission')
 
@@ -121,7 +122,7 @@ class Phase2MissionNode(Node):
         self.sonoptix_sub = self.create_subscription(PointCloud2, '/sonoptix/points', self._sonoptix_cb, best_effort_qos)
 
         self.wrench_pub = self.create_publisher(Wrench, '/auv/command_wrench', 10)
-        # Changed to VOLATILE so tools like Foxglove and ros2 topic pub can trigger it reliably
+
         latching_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
@@ -135,7 +136,7 @@ class Phase2MissionNode(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         self.state: str = State.DESCENDING
-        # Publish initial state immediately
+
         self._publish_done_status()
         self.current_x, self.current_y, self.current_z = 0.0, 0.0, 0.0
         self.current_yaw, self.current_vyaw = 0.0, 0.0
@@ -264,23 +265,20 @@ class Phase2MissionNode(Node):
             self._stabilize_start_time = self.get_clock().now().nanoseconds * 1e-9
 
     def _do_stabilizing(self):
-        # 1. Maintain Depth
+
         depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
         self._set_Fz(depth_cmd)
 
-        # 2. Maintain Yaw
         yaw_error = _angle_diff(self.target_yaw, self.current_yaw)
         mz_cmd = np.clip((KP_YAW * yaw_error) - (KD_YAW * self.current_vyaw), -MAX_YAW_CMD, MAX_YAW_CMD)
         self._set_Mz(mz_cmd)
 
-        # 3. Maintain Standoff Distance (Active Braking)
         if self.sonoptix_range is not None:
             surge_cmd = np.clip(KP_SURGE * (self.sonoptix_range - STANDOFF_DIST), -MAX_SURGE_CMD, MAX_SURGE_CMD)
             self._set_Fx(surge_cmd)
         else:
             self._set_Fx(0.0)
 
-        # 4. Check Timer
         now = self.get_clock().now().nanoseconds * 1e-9
         if self._stabilize_start_time and (now - self._stabilize_start_time) >= STABILIZE_TIME:
             self.get_logger().info("[STABILIZING → STANDOFF] Robot stabilized. Defining local origin.")
@@ -321,26 +319,18 @@ class Phase2MissionNode(Node):
         pose_msg.pose.orientation.z = qz
         pose_msg.pose.orientation.w = qw
         
-        # Sauvegarde pour publication continue
         self._local_origin_pose = pose_msg
 
     def _publish_done_status(self):
-        """Publishes whether Phase 2 is complete."""
         done_msg = Bool()
         done_msg.data = (self.state == State.STANDOFF)
         self.done_pub.publish(done_msg)
 
     def _do_standoff(self):
-        """Hold position at standoff; purely communication phase for MPC takeover."""
-        # Note: _publish_done_status() now handles the 'done' publication in the main loop.
-
-
-        # 2. Publier la pose de l'origine en boucle pour s'assurer que le MPC la reçoive
         if hasattr(self, '_local_origin_pose'):
             self._local_origin_pose.header.stamp = self.get_clock().now().to_msg()
             self.origin_pub.publish(self._local_origin_pose)
 
-        # 3. Diffuser la transformation TF en boucle
         if hasattr(self, '_local_origin_transform'):
             self._local_origin_transform.header.stamp = self.get_clock().now().to_msg()
             self.tf_broadcaster.sendTransform(self._local_origin_transform)
@@ -350,7 +340,8 @@ class Phase2MissionNode(Node):
     def _set_Fx(self, fx: float): self._cmd_Fx = fx
 
     def _publish_state(self):
-        # On laisse la main au MPC une fois en STANDOFF
+        """Publishes the current state and corresponding Wrench commands."""
+        # Hand over control to the MPC once in STANDOFF state
         if self.state == State.STANDOFF:
             phase_msg = String()
             phase_msg.data = self.state

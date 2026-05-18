@@ -1,132 +1,69 @@
-# ROS 2 AUV Project
+# ROS 2 Autonomous Underwater Vehicle (AUV) Project
 
-Welcome to the ROS 2 AUV (Autonomous Underwater Vehicle) project! This workspace contains everything you need to simulate and control an underwater robot (specifically based on the BlueROV2) in a 3D environment.
+## 1. Introduction for Beginners
 
+Welcome to the ROS 2 AUV project! This workspace contains the complete software stack needed to simulate and control an intelligent underwater robot (specifically based on the BlueROV2).
 
-## Project Overview
+Imagine this project as a complete digital brain and training ground for a submarine:
+- It provides a **virtual ocean** (simulation) where the robot can safely swim.
+- It gives the robot **eyes and ears** (perception) to see structures like aquaculture nets.
+- It tells the robot **where it is** (localization) without needing GPS.
+- It provides the **intelligence** (guidance) to make autonomous decisions, like finding a net, approaching it, and performing a 360° cyclic inspection.
 
-The project is divided into differents packages:
+Whether you are running the mission purely on your computer or deploying the code to a real-world BlueROV2, this workspace provides all the necessary tools.
 
-1. **`AUV_guidance`** (Guidance): The high-level decision maker. Generates trajectories and manages mission state transitions.
-2. **`AUV_controller`** (Control): The low-level execution layer. Calculates the physical forces needed to follow the guidance instructions using Model Predictive Control (MPC) or PID Station Keeping.
-3. **`AUV_description`** (Dynamics): Contains the physical 3D model of the submarine (URDF/Xacro), its sensors, and the virtual simulation environments (Gazebo).
-4. **`my_auv_localization`** (Navigation): Fuses sensor data (IMU, DVL) using an Extended Kalman Filter (EKF) to estimate the robot's precise 3D position and orientation.
-5. **`auv_dvl_bridge`**: Hardware/Simulation interface that translates raw DVL sensor data into standard ROS 2 formats.
-6. **`auv_perception`** (Mapping): Processes sonar point clouds to generate and auto-save a real-time OctoMap 3D voxel grid representing the environment.
+---
 
-## Prerequisites
+## 2. Quick Start Guide
 
-Before starting, ensure you have:
-- A Linux computer (Ubuntu is recommended).
-- **ROS 2** installed (e.g., Jazzy).
-- **Gazebo** installed (the 3D simulation software).
+### Prerequisites
+Before starting, ensure your system has:
+- A Linux operating system (Ubuntu is highly recommended).
+- **ROS 2** installed (e.g., Jazzy or Humble).
+- **Gazebo Harmonic** installed (for the 3D physics simulation).
 
-## How to Use the Project
-
-Follow these steps to launch the simulation and make the robot move or execute missions.
-
-### 1. Build the Workspace
-
-First, compile the code so the system can run it. Open a terminal and run the following commands:
+### Building the Workspace
+First, compile the code so the system can run it. Open a terminal and run:
 
 ```bash
-# Go to the project folder
 cd ~/AUV_project/ros2_AUV
-
-# Compile the code
 colcon build
-
-# Source the newly compiled programs
 source install/setup.bash
 ```
+*(Note: You must run `source install/setup.bash` every time you open a new terminal.)*
 
-*Note: You must run `source install/setup.bash` every time you open a new terminal.*
+### Launching the Autonomous Mission
+The main showcase of this project is the fully autonomous net inspection mission. This single command starts the ocean simulation, the robot, the sensors, and the autonomous intelligence:
 
-### 2. Launch the 3D Simulation
-
-Start the virtual environment and spawn the robot. In the same terminal, run:
-
-- **Full Mission (Approach + Cyclic Inspection)**:
-  Launches the realistic world, robot, EKF, and the sequenced phase of approach and multi-depth cyclic phase of inspection.
-  ```bash
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
-  ```
-  *Note: Add `use_hardware:=True` to launch with MAVROS and the `bluerov2_bridge` instead of Gazebo for real robot deployment.*
-
-Alternatively, you can launch standalone simulation environments (useful for manual testing):
-- **Equipped with sensors in a basin**: `ros2 launch AUV_description bluerov2_bassin_captors.launch.py`
-- **Realistic AUV in the bassin**: `ros2 launch AUV_description bluerov2_realist_bassin.launch.py`
-
-### 3. Start the Guidance or Controllers manually
-
-If you didn't launch the full inspection mission, you can start the components manually in a **new, sourced terminal**.
-
-**1. Guidance (Missions & Trajectories) (Not recommanded):**
-- **Approach & Standoff**:
-  ```bash
-  ros2 run AUV_guidance net_approach
-  ```
-- **Inspection in circle**:
-  ```bash
-  ros2 run AUV_guidance phase3_inspection
-  ```
-
-**2. Control Algorithms:**
-- **MPC with Sensors**: Standard MPC using real sensor data (EKF odometry).
-  ```bash
-  ros2 run AUV_controller mpc_controller_sensors
-  ```
-- **Station Keeping**: Makes the robot hold its current position.
-  ```bash
-  ros2 run AUV_controller station_keeping
-  ```
-
-**3. Basic Open-Loop Movement (Hardware Testing):**
-These scripts apply a constant force to test engines:
-- **Move Forward**:
-  ```bash
-  ros2 run AUV_controller move_forward
-  ```
-- **Move Down**:
-  ```bash
-  ros2 run AUV_controller move_down
-  ```
-
-### 4. 3D Mapping & Perception
-
-The `auv_perception` package handles 3D mapping using OctoMap. It runs the sensor data filters and the map building server independently. It automatically saves the generated map every 60 seconds (`net_map_autosave.bt`).
-To launch the mapping nodes in parallel with your simulation:
 ```bash
-ros2 launch auv_perception mapping.launch.py
+ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False
 ```
 
-## Troubleshooting
+> **Hardware Deployment:** To run this exact same mission on the real BlueROV2 instead of the simulator, simply append `use_hardware:=True` to the launch command.
 
-- **"Command not found: colcon"** or **"ros2: command not found"**: You probably forgot to source your main ROS 2 installation. Run `source /opt/ros/humble/setup.bash` (replace `humble` with your ROS 2 version).
-- **The robot spins or flies out of the water**: Physics simulations can sometimes glitch. Close the terminals (using `Ctrl+C`) and start the simulation again.
-- **Gazebo is very slow**: 3D simulations require a decent graphics card. If it's too slow, make sure your computer is plugged in and using its dedicated GPU if it has one.
+### Visualizing with Foxglove
+To see what the robot sees (cameras, sonar, 3D position) in real-time using [Foxglove Studio](https://foxglove.dev/):
+1. Install the bridge if needed: `sudo apt install ros-jazzy-foxglove-bridge` (replace `jazzy` with your version).
+2. Run the bridge in a sourced terminal: `ros2 run foxglove_bridge foxglove_bridge`
+3. Open Foxglove Studio, click "Open connection", select "Foxglove WebSocket", and connect to `ws://localhost:8765` (or your robot's IP).
 
-Enjoy experimenting with your autonomous underwater vehicle!
+---
 
-## Visualization with Foxglove
+## 3. Technical Architecture
 
-To visualize the robot's sensors and telemetry (cameras, sonar, 3D pose) in real-time using [Foxglove](https://foxglove.dev/), we use the **Foxglove Bridge**.
+This workspace is highly modular, separated into specialized ROS 2 packages. **For detailed information on any of these components, please read the specific `README.md` located inside each package folder.**
 
-1. **Install Foxglove Bridge** (if not already installed):
-   ```bash
-   sudo apt install ros-jazzy-foxglove-bridge
-   ```
+1. **`AUV_guidance`** (The Brain): Handles the high-level mission state machine (Approach, Standoff, Inspect). It uses reactive PID controllers to orbit the net and maintain distance, depth, and orientation.
+2. **`AUV_description`** (The Body & Environment): Contains the URDF 3D models, sensor plugins, and the Gazebo underwater world files (`.xml`).
+3. **`auv_perception`** (The Eyes & Memory): Filters raw Sonoptix point clouds, estimates the net's orientation via PCA line-fitting, and handles saving 3D OctoMaps.
+4. **`my_auv_localization`** (The Inner Ear): Fuses DVL, IMU, and Depth data through an Extended Kalman Filter (EKF) to provide a smooth, reliable 6-DOF odometry.
+5. **`auv_dvl_bridge`** (The Translator): Converts raw Gazebo DVL protobuf messages into standard ROS 2 Twist formats with covariance for the EKF.
+6. **`AUV_controller`** *(Archived/Research)*: Contains historical Model Predictive Control (MPC) algorithms. Currently bypassed in favor of the reactive PIDs in `AUV_guidance`.
 
-2. **Launch the Foxglove Bridge Node**:
-   Open a new terminal, source your workspace, and run:
-   ```bash
-   ros2 run foxglove_bridge foxglove_bridge
-   ```
-   *(By default, this opens a WebSocket connection on port `8765`)*
+---
 
-3. **Connect from Foxglove Studio**:
-   - Open the **Foxglove Studio** app (desktop or web version).
-   - Click "**Open connection**".
-   - Select "**Foxglove WebSocket**".
-   - Enter the URL: `ws://172.19.68.228:8765` (or replace `localhost` with your robot's IP if running on a different machine).
-   - You can now visualize topics like `/odom`, `/camera/image_raw`, `/ping360/scan`, and 3D models!
+## 4. Maintenance & Troubleshooting
+
+- **"Command not found: colcon"** or **"ros2: command not found"**: You forgot to source your main ROS 2 installation. Run `source /opt/ros/jazzy/setup.bash` (replace `jazzy` with your version).
+- **Gazebo is very slow**: 3D simulations require a decent graphics card. If it's too slow, make sure your computer is plugged in and using its dedicated GPU. You can also run the mission without the graphical window by adding `headless:=True` to your launch command.
+- **The robot spins or flies out of the water**: Physics simulations can sometimes glitch upon spawning the robot. If this happens, close the terminals (using `Ctrl+C`) and start the launch again.

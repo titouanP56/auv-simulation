@@ -3,8 +3,8 @@
 <sdf version="1.8">
   <world name="ocean_40m">
 
-    <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
+    <physics name="4ms" type="ignored">
+      <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
 
@@ -107,13 +107,22 @@
             </mesh>
           </geometry>
         </visual>
-        <collision name="net_collision">
-          <pose>0 0 0 1.5708 0 0</pose> 
+        <collision name="cylinder_collision">
+          <pose>0 0 -1.5 0 0 0</pose>
           <geometry>
-            <mesh>
-              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
-              <scale>0.002 0.002 0.002</scale>
-            </mesh>
+            <cylinder>
+              <radius>5.0</radius>
+              <length>3.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <collision name="cone_collision">
+          <pose>0 0 -4.5 3.14159 0 0</pose>
+          <geometry>
+            <cone>
+              <radius>5.0</radius>
+              <length>3.0</length>
+            </cone>
           </geometry>
         </collision>
       </link>

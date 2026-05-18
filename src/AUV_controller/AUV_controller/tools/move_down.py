@@ -35,7 +35,7 @@ class MoveDownNode(Node):
         
         cmd = [0.0, 0.0, 0.0, 0.0, t5, t6, t7, t8]
         
-        self.get_logger().info(f"Plonger publiera les forces : {cmd[4:]}")
+        self.get_logger().info(f"Diving with forces: {cmd[4:]}")
         self.timer = self.create_timer(0.1, lambda: self.publish_thrusts(cmd))
 
     def publish_thrusts(self, cmd):

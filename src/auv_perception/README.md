@@ -1,26 +1,85 @@
-# auv_perception
+# AUV Perception
 
-The `auv_perception` package provides 3D mapping capabilities for the ROS 2 AUV project. It filters noisy sonar feedback and relies on standard tools like `octomap_server` to generate real-time voxel occupancy grids.
+## 1. Introduction for Beginners
 
-## Features
+Welcome to the **AUV Perception** package! This package acts as the "eyes and memory" of the underwater robot.
 
-1. **Sonar Filtering (`sonar_filter_node.py`)**: 
-   Subscribes to raw Sonoptix sonar data (`/sonoptix/points`), filters out points with a range greater than 4.0 meters to remove noise and out-of-bounds echoes, and publishes the clean cloud to `/sonoptix/points_filtered`.
+When the robot swims around the aquaculture net, it receives thousands of data points every second from its sonar (like an underwater radar). This package is responsible for:
+1. **Filtering the noise**: Removing echoes from things that are too far away or irrelevant.
+2. **Understanding the shape**: Analyzing the filtered sonar points to figure out exactly how the net is angled relative to the robot.
+3. **Saving memories**: Taking the 3D map that the robot builds as it swims (using a tool called OctoMap) and automatically saving it to the computer's hard drive so it doesn't get lost when we turn the robot off.
 
-2. **3D Mapping (OctoMap)**: 
-   Utilizes the standard `octomap_server_node` to build a 3D probabilistic occupancy grid (`odom` to `base_link` tracking). Water surface constraints are managed via the `occupancy_max_z` parameter.
+---
 
-3. **Auto-Saving (`auto_saver_node.py`)**: 
-   A background Python node that automatically calls the OctoMap CLI tool via `subprocess.run` to save the current map state to `net_map_autosave.bt` within this package's directory every 60 seconds. It also guarantees a final save upon graceful shutdown (`Ctrl+C`).
+## 2. Quick Start Guide
 
-## Usage
-
-You can launch the entire perception stack (filtering, mapping, and auto-saving) with a single launch file in parallel with your Gazebo environment and vehicle controller:
+### Prerequisites
+Make sure your ROS 2 workspace is sourced and built.
 
 ```bash
-ros2 launch auv_perception mapping.launch.py
+cd ~/AUV_project/ros2_AUV
+colcon build --packages-select auv_perception
+source install/setup.bash
 ```
 
-## Configuration
+### Running the Nodes
 
-OctoMap parameters (voxel resolution, raycasting range, tracking frames, and Z-limits) are firmly defined in `config/octomap_params.yaml`.
+These nodes are usually launched automatically by the main mission launch files, but you can run them individually for testing:
+
+**1. Run the Sonar Filter:**
+Filters out sonar points beyond 4.0 meters.
+```bash
+ros2 run auv_perception sonar_filter_node
+```
+
+**2. Run the Net Local Estimator:**
+Analyzes the filtered points to estimate the net's pose.
+```bash
+ros2 run auv_perception net_local_estimator
+```
+
+**3. Run the Auto Saver:**
+Automatically saves the OctoMap every 60 seconds.
+```bash
+ros2 run auv_perception auto_saver_node
+```
+
+---
+
+## 3. Technical Architecture
+
+This package contains lightweight, specialized Python nodes that process `sensor_msgs/PointCloud2` data and manage system-level save operations.
+
+### Core Nodes
+
+1. **`sonar_filter_node`**: 
+   - **Role**: Distance-based filtering of the raw Sonoptix point cloud.
+   - **Logic**: Converts the `PointCloud2` into a numpy structured array, calculates the Euclidean distance for every point, and drops points where $D > 4.0$ meters.
+   - **Output**: Publishes `/sonoptix/points_filtered`.
+
+2. **`net_local_estimator`**:
+   - **Role**: Estimates the localized pose of the net surface relative to the robot.
+   - **Logic**: Takes the filtered point cloud, restricts points to a $\pm 45^\circ$ horizontal cone, and uses Principal Component Analysis (PCA) to perform a robust 2D line fit. The smallest eigenvector provides the normal vector to the net. It applies a moving-average filter (window=5) to smooth the calculated distance and yaw.
+   - **Output**: Publishes a `geometry_msgs/PoseStamped` on `/perception/net_local_frame` representing the closest point on the net and its normal orientation.
+
+3. **`auto_saver_node`**:
+   - **Role**: Persistent storage of the OctoMap.
+   - **Logic**: Uses a ROS 2 timer to trigger a system `subprocess` every 60 seconds. It calls the `octomap_saver_node` executable to save the current `.bt` file into the `auv_perception` source directory. Captures `KeyboardInterrupt` (Ctrl+C) to guarantee a final save on shutdown.
+
+### Subscribed Topics
+- `/sonoptix/points` (`sensor_msgs/PointCloud2`): Raw sonar point cloud.
+- `/sonoptix/points_filtered` (`sensor_msgs/PointCloud2`): Filtered sonar data (used by the estimator).
+
+### Published Topics
+- `/sonoptix/points_filtered` (`sensor_msgs/PointCloud2`): Output of the filter node.
+- `/perception/net_local_frame` (`geometry_msgs/PoseStamped`): Estimated pose of the net.
+
+---
+
+## 4. Maintenance Guide
+
+If you are a developer taking over this project, here is how you can modify or improve the perception code:
+
+- **Adjusting the Sonar Filter Distance**: Open `sonar_filter_node.py` and modify the condition `distances <= 4.0`. If you are testing in a very large environment, you may want to increase this threshold.
+- **Tuning the Net Estimator Smoothing**: In `net_local_estimator.py`, the `deque` sizes for `distance_history` and `angle_history` dictate how much the normal vector is smoothed. Increase `maxlen=5` for a smoother but more sluggish response.
+- **Changing the Map Save Location**: The `auto_saver_node.py` dynamically resolves the package path to save `net_map_autosave.bt` directly into the `src/auv_perception` folder. If this fails, it defaults to your home directory (`~/net_map_autosave.bt`). You can modify the `save_path` variable to target a dedicated logging directory.

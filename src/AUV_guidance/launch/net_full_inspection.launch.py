@@ -1,32 +1,4 @@
-"""
-net_full_inspection.launch.py
-==============================
-Full Phase 2 → Phase 3 mission launch.
 
-What this file does
---------------------
-1. Starts Gazebo Harmonic with small_net.xml   (GUI toggle: headless:=True/False)
-2. Spawns BlueROV2 at a **random point on a circle of radius 2 m** at depth -1 m
-3. Starts all sensor bridges, EKF, TF publishers, DVL, depth-sensor, IMU bridges
-4. Starts ``net_approach``  (Phase 2) after a startup delay
-5. Starts ``phase3_inspection`` (Phase 3) after a slightly longer delay
-   — Phase 3 node waits internally for /mission/phase2_done before acting
-6. Optionally starts RViz2                     (rviz:=True/False)
-
-Launch arguments
-----------------
-  headless   False   Set True to run Gazebo without a graphical window
-  rviz       False   Set True to open RViz2 for sensor/TF visualisation
-  world_file small_net.xml   Name of the world file inside AUV_description/world/
-  gz_delay   5.0     Seconds to wait after Gazebo starts before spawning nodes
-
-Usage
------
-  ros2 launch AUV_guidance net_full_inspection.launch.py
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True
-  ros2 launch AUV_guidance net_full_inspection.launch.py rviz:=True
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True rviz:=False
-"""
 
 import math
 import os
@@ -56,10 +28,10 @@ PKG_LOC    = get_package_share_directory('my_auv_localization')
 PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 
 
-# ── Random spawn on circle ────────────────────────────────────────────────────
+# ── Spawn coordinates ────────────────────────────────────────────────────
 
 _SPAWN_RADIUS = 3.4    # [m]  circle radius
-_SPAWN_DEPTH  = -2   # [m]  constant depth (negative = underwater in NED-like frame)
+_SPAWN_DEPTH  = -2   # [m]  depth
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)
@@ -340,10 +312,7 @@ def generate_launch_description():
     )
 
     # ── Mission nodes (delayed) ───────────────────────────────────────────────
-    # Both nodes are launched together after gz_delay seconds.
-    # - net_approach (Phase 2) starts immediately and runs its state machine.
-    # - phase3_inspection (Phase 3) starts at the same time but stays WAITING
-    #   until it receives True on /mission/phase2_done — no extra delay needed.
+
 
     net_approach_node = Node(
         package='AUV_guidance',
