@@ -20,24 +20,24 @@ import tf2_ros
 
 TARGET_DEPTH          = -2.0   
 STANDOFF_DIST         = 1.5    
-CONTROL_RATE_HZ       = 20.0   
+CONTROL_RATE_HZ       = 10.0   
 
 KP_DEPTH              = 10.0
 KI_DEPTH              = 0.2
 KD_DEPTH              = 0.2
 BUOYANCY_COMP         = 3.0    
 
-KP_DIST               = 12.0
+KP_DIST               = 4.0
 KI_DIST               = 0.2
-KD_DIST               = 1.0
+KD_DIST               = 1.5
 
-KP_VEL_SWAY           = 40.0
+KP_VEL_SWAY           = 15.0
 KI_VEL_SWAY           = 2.0
 KD_VEL_SWAY           = 0.5
 
-KP_YAW                = 10.0
+KP_YAW                = 5.0
 KI_YAW                = 0.02
-KD_YAW                = 3.0 
+KD_YAW                = 1.0
 
 KP_PITCH              = 10.0
 KI_PITCH              = 0.2
@@ -45,8 +45,11 @@ KD_PITCH              = 2.0
 
 MAX_DEPTH_CMD         = 15.0   
 MAX_DIST_CMD          = 15.0   
-MAX_YAW_CMD           = 20.0   
+MAX_YAW_CMD           = 10.0   
 MAX_INDIVIDUAL_THRUST = 40.0   
+
+
+MZ_RATE_LIMIT         = 3.0     # Max change in Mz per control step [N·m/step]
 
 ORBIT_DIRECTION       = 1  
 PERCENTILE_FRACTION   = 0.10 
@@ -134,66 +137,46 @@ class PID:
 # ── Sonar processing ───────────────────────────────────────────────────────────
 
 def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float | None, float | None]:
-    """
-    Extracts the distance AND the angle of the closest point for perpendicular alignment.
-    Also extracts the median distances TOP and BOTTOM for normal control (Pitch).
-    """
-    field_map = {f.name: f for f in msg.fields}
-    if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
+    if msg.width * msg.height == 0:
         return None, 0.0, None, None
 
-    point_step, data = msg.point_step, msg.data
-    x_off, y_off, z_off = field_map['x'].offset, field_map['y'].offset, field_map['z'].offset
-
-    valid_points = []
-    top_points = []
-    bottom_points = []
-
-    for i in range(msg.width * msg.height):
-        base = i * point_step
-        try:
-            px = struct.unpack_from('f', data, base + x_off)[0]
-            py = struct.unpack_from('f', data, base + y_off)[0]
-            pz = struct.unpack_from('f', data, base + z_off)[0]
-        except: continue
-
-        if not (math.isfinite(px) and math.isfinite(py) and math.isfinite(pz)):
-            continue
-
-        angle = math.atan2(py, px)
-        dist = math.sqrt(px**2 + py**2 + pz**2)
-
-        if dist < 0.3 or dist > 7.0 or abs(angle) > 1.57:
-            continue
-
-        valid_points.append((dist, angle))
-        if pz > 0:
-            top_points.append(dist)
-        elif pz < 0:
-            bottom_points.append(dist)
-
-    if not valid_points:
-        return None, 0.0, None, None
-
-    valid_points.sort(key=lambda p: p[0])
+    # Déballage rapide du buffer binaire en tableau de float32
+    payload = np.frombuffer(msg.data, dtype=np.float32)
+    floats_per_point = msg.point_step // 4
+    points = payload.reshape(-1, floats_per_point)
     
-    n_use = max(1, int(len(valid_points) * PERCENTILE_FRACTION))
-    closest_points = valid_points[:n_use]
+    px = points[:, 0]
+    py = points[:, 1]
+    pz = points[:, 2]
 
-    avg_dist = float(np.mean([p[0] for p in closest_points]))
-    avg_angle = float(np.mean([p[1] for p in closest_points]))
+    # Calculs vectoriels des distances et angles
+    dists = np.sqrt(px**2 + py**2 + pz**2)
+    angles = np.arctan2(py, px)
 
-    dist_top = None
-    if top_points:
-        top_points.sort()
-        n_top = max(1, int(len(top_points) * PERCENTILE_FRACTION))
-        dist_top = float(np.median(top_points[:n_top]))
+    # Filtrage par masque booléen NumPy (équivalent aux filtres d'origine)
+    valid_mask = (dists >= 0.3) & (dists <= 7.0) & (np.abs(angles) <= 1.57) & np.isfinite(dists)
+    
+    if not np.any(valid_mask):
+        return None, 0.0, None, None
 
-    dist_bottom = None
-    if bottom_points:
-        bottom_points.sort()
-        n_bot = max(1, int(len(bottom_points) * PERCENTILE_FRACTION))
-        dist_bottom = float(np.median(bottom_points[:n_bot]))
+    valid_dists = dists[valid_mask]
+    valid_angles = angles[valid_mask]
+    valid_pz = pz[valid_mask]
+
+    # Tri pour extraire le percentile inférieur (points les plus proches)
+    sort_idx = np.argsort(valid_dists)
+    n_use = max(1, int(len(sort_idx) * PERCENTILE_FRACTION))
+    closest_idx = sort_idx[:n_use]
+
+    avg_dist = float(np.mean(valid_dists[closest_idx]))
+    avg_angle = float(np.mean(valid_angles[closest_idx]))
+
+    # Séparation Top / Bottom pour le contrôle du Pitch en mode cône
+    top_mask = valid_pz > 0
+    bot_mask = valid_pz < 0
+
+    dist_top = float(np.median(valid_dists[top_mask][:n_use])) if np.any(top_mask) else None
+    dist_bottom = float(np.median(valid_dists[bot_mask][:n_use])) if np.any(bot_mask) else None
 
     return avg_dist, avg_angle, dist_top, dist_bottom
 
@@ -290,6 +273,8 @@ class Phase3InspectionNode(Node):
         self._sonar_median = MovingMedian(MEDIAN_WINDOW)
         self._last_sonar_time: float | None = None
         self.net_angle_error: float = 0.0
+        self._smoothed_yaw_error: float = 0.0  # EMA-filtered yaw error
+        self._last_Mz: float = 0.0             # For rate limiting
         self.dist_top: float | None = None
         self.dist_bottom: float | None = None
 
@@ -303,7 +288,7 @@ class Phase3InspectionNode(Node):
         self._pid_dist  = PID(KP_DIST,  KI_DIST,  KD_DIST,  integral_limit=10.0)
         self._pid_yaw   = PID(KP_YAW,   KI_YAW,   KD_YAW,   integral_limit=10.0)
         self._pid_pitch = PID(KP_PITCH, KI_PITCH, KD_PITCH, integral_limit=10.0)
-        self._pid_velocity_sway = PID(15.0, 0.5, 0.0, integral_limit=20.0)
+        self._pid_velocity_sway = PID(KP_VEL_SWAY, KI_VEL_SWAY, KD_VEL_SWAY, integral_limit=20.0)
 
         self._last_fx = 0.0
 
@@ -317,7 +302,11 @@ class Phase3InspectionNode(Node):
         self._accumulated_dist = 0.0
         self._last_R_calculated = 0.0
 
-        self._dt = 1.0 / CONTROL_RATE_HZ
+        self.declare_parameter('control_rate_hz', CONTROL_RATE_HZ)
+        _rate = self.get_parameter('control_rate_hz').value
+        self._dt = 1.0 / _rate
+        self.declare_parameter('yaw_ema_alpha', 1.0)
+        self._yaw_ema_alpha = self.get_parameter('yaw_ema_alpha').value
         self._last_loop_time: float | None = None
         self._target_yaw: float | None = None   # Updated continuously using DVL lateral velocity
         self._yaw_error_prev = 0.0
@@ -327,7 +316,7 @@ class Phase3InspectionNode(Node):
 
         # ── Control timer ────────────────────────────────────────────────────
         self.create_timer(self._dt, self._control_loop)
-        self.get_logger().info("Phase3InspectionNode started — state: WAITING")
+        self.get_logger().info(f"Phase3InspectionNode started — state: WAITING (rate={_rate:.0f} Hz, yaw_ema_alpha={self._yaw_ema_alpha:.2f})")
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -604,8 +593,14 @@ class Phase3InspectionNode(Node):
             sway_vel_error = 0.0 - self.current_vy
             Fy = float(np.clip(self._pid_velocity_sway.compute(sway_vel_error, dt), -10.0, 10.0))
         
-        yaw_error = self.net_angle_error
-        Mz = float(np.clip(self._pid_yaw.compute(yaw_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
+        # Smooth yaw error with EMA to avoid step-change spikes from 2 Hz sonar
+        self._smoothed_yaw_error += self._yaw_ema_alpha * (self.net_angle_error - self._smoothed_yaw_error)
+        yaw_error = self._smoothed_yaw_error
+        Mz_raw = float(np.clip(self._pid_yaw.compute(yaw_error, dt), -MAX_YAW_CMD, MAX_YAW_CMD))
+        # Rate-limit Mz to prevent sharp torque spikes
+        Mz_delta = np.clip(Mz_raw - self._last_Mz, -MZ_RATE_LIMIT, MZ_RATE_LIMIT)
+        Mz = self._last_Mz + Mz_delta
+        self._last_Mz = Mz
 
         if self.in_cone_mode and self.dist_top is not None and self.dist_bottom is not None:
             pitch_error = self.dist_top - self.dist_bottom

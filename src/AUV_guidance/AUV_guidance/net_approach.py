@@ -28,7 +28,7 @@ STANDOFF_DIST     = 1.5     # [m]
 APPROACH_TOL      = 0.10    # [m]
 STABILIZE_TIME    = 3.0     # [s]
 
-KP_DEPTH  = 30.0
+KP_DEPTH  = 15.0
 BUOYANCY_COMPENSATION = 3.0
 KP_YAW    = 5.0
 KD_YAW    = 2.0
@@ -41,7 +41,8 @@ MAX_SURGE_CMD   = 25.0
 PING360_IGNORE_THRESHOLD = 0.95
 SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)
 
-CONTROL_RATE_HZ = 20.0
+CONTROL_RATE_HZ = 10.0
+SCAN_ACCUMULATION_TIME = 4.0   # [s] wait for multiple Ping360 scans before choosing direction
 
 MAX_INDIVIDUAL_THRUST = 20.0
 
@@ -147,9 +148,13 @@ class Phase2MissionNode(Node):
         self._depth_ok_since: float | None = None
         self._yaw_ok_since: float | None = None
         self._have_odom, self._have_scan, self._have_points = False, False, False
+        self._scan_start_time: float | None = None
+        self._scan_angles: list[float] = []
 
-        self.timer = self.create_timer(1.0 / CONTROL_RATE_HZ, self._control_loop)
-        self.get_logger().info("Phase2MissionNode started → state: DESCENDING")
+        self.declare_parameter('control_rate_hz', CONTROL_RATE_HZ)
+        _rate = self.get_parameter('control_rate_hz').value
+        self.timer = self.create_timer(1.0 / _rate, self._control_loop)
+        self.get_logger().info(f"Phase2MissionNode started → state: DESCENDING (rate={_rate:.0f} Hz)")
 
     def _odom_cb(self, msg: Odometry):
         self.current_x    = msg.pose.pose.position.x
@@ -170,10 +175,13 @@ class Phase2MissionNode(Node):
 
         min_idx = msg.ranges.index(min_r)
         angle = msg.angle_min + min_idx * msg.angle_increment
-        self.target_yaw = self.current_yaw + angle
+        world_yaw = self.current_yaw + angle
 
-        self.get_logger().info(f"[SCANNING] Nearest wall: {min_r:.2f} m → target world yaw {math.degrees(self.target_yaw):.1f}°")
-        self._have_scan = True
+        # Accumulate scan readings instead of using the first one
+        self._scan_angles.append(world_yaw)
+        self.get_logger().info(
+            f"[SCANNING] Reading {len(self._scan_angles)}: nearest wall {min_r:.2f} m at yaw {math.degrees(world_yaw):.1f}°"
+        )
 
     def _sonoptix_cb(self, msg: PointCloud2):
         if self.state in (State.APPROACHING, State.STABILIZING, State.STANDOFF):
@@ -220,10 +228,28 @@ class Phase2MissionNode(Node):
         depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
         self._set_Fz(depth_cmd); self._set_Mz(0.0); self._set_Fx(0.0)
 
-        if self._have_scan:
-            self.get_logger().info(f"[SCANNING → ALIGNING] Target yaw: {math.degrees(self.target_yaw):.1f}°")
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if self._scan_start_time is None:
+            self._scan_start_time = now
+
+        elapsed = now - self._scan_start_time
+        if elapsed >= SCAN_ACCUMULATION_TIME and len(self._scan_angles) >= 2:
+            # Use median of accumulated angles for robustness
+            import statistics
+            self.target_yaw = statistics.median(self._scan_angles)
+            self.get_logger().info(
+                f"[SCANNING → ALIGNING] Median yaw from {len(self._scan_angles)} readings: "
+                f"{math.degrees(self.target_yaw):.1f}°"
+            )
             self.state = State.ALIGNING
-            self._have_scan = False
+            self._scan_angles.clear()
+        elif elapsed >= SCAN_ACCUMULATION_TIME and len(self._scan_angles) == 1:
+            self.target_yaw = self._scan_angles[0]
+            self.get_logger().info(
+                f"[SCANNING → ALIGNING] Single reading yaw: {math.degrees(self.target_yaw):.1f}°"
+            )
+            self.state = State.ALIGNING
+            self._scan_angles.clear()
 
     def _do_aligning(self):
         depth_cmd = np.clip((KP_DEPTH * (TARGET_DEPTH - self.current_z)) - BUOYANCY_COMPENSATION, -MAX_DEPTH_CMD, MAX_DEPTH_CMD)
