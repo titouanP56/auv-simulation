@@ -41,10 +41,16 @@ You can customize the mission execution using the following arguments (append `a
 | `rviz` | `False` | Launch RViz2 to visualize sensor data, point clouds, and TF trees. |
 | `world_file` | `small_net.xml` | Specify the Gazebo world file to load (located in `AUV_description/world/`). |
 | `gz_delay` | `8.0` | Seconds to wait for Gazebo to initialize before spawning the robot and mission nodes. |
+| `optimize` | `False` | **Performance mode**: coarser physics step (6 ms vs 1 ms), reduced URDF sensor rates, slower control loops (5 Hz vs 20 Hz). Use on low-end machines or for headless batch runs. |
 
 *Example:*
 ```bash
 ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True rviz:=True use_hardware:=False
+```
+
+*Performance mode example (low-end machine or CI):*
+```bash
+ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True
 ```
 
 **(For developers) Running specific nodes manually:**
@@ -98,3 +104,37 @@ If you are a developer taking over this project, here is how you can modify or i
 - **Adjusting the Standoff Distance**: If the robot is too close or too far from the net, change the `STANDOFF_DIST` constant (currently 1.5m) at the top of the phase scripts.
 - **Improving Wall Recovery**: If the robot frequently loses the net and struggles to find it in `LOST_WALL` state, consider tweaking the `RECOVERY_YAW_CMD` (the speed at which it rotates to search) and `LOST_WALL_TIMEOUT` parameters.
 - **Hardware vs Simulation**: When moving from Gazebo to the real pool, ensure your launch files remap the outputs correctly. You must run `bluerov2_bridge` instead of `sim_thruster_bridge`, and ensure MAVROS is properly configured.
+
+---
+
+## 5. Performance / Optimize Mode
+
+Both launch files (`net_full_inspection.launch.py` and `net_inspection_big_net.launch.py`) expose an `optimize` argument that reduces simulation load without changing any source file.
+
+### What changes with `optimize:=True`
+
+| Parameter | Normal mode (`False`) | Optimize mode (`True`) |
+|---|---|---|
+| Gazebo `max_step_size` | `0.001` s (1 ms) | `0.006` s (6 ms) |
+| URDF sensor update rates | Full rate | Reduced rate (via `xacro optimize:=true`) |
+| Mission control loop (`control_rate_hz`) | 20 Hz | 5 Hz |
+| Yaw EMA filter alpha (`yaw_ema_alpha`) | `0.15` (smoothed) | `1.0` (no smoothing) |
+
+### Affected launch files
+
+| Launch file | Default world | Target scenario |
+|---|---|---|
+| `net_full_inspection.launch.py` | `small_net.xml` | Small aquaculture net (radius ≈ 3.4 m) |
+| `net_inspection_big_net.launch.py` | `ocean_40m.xml` | Large net (radius ≈ 20 m) |
+
+### How it works
+
+1. **Physics step** — The launch script reads the selected world `.xml`, patches `<max_step_size>` in memory with a regex, and writes the result to a temporary file. The original world files in `AUV_description/world/` are **never modified on disk**.
+2. **URDF sensors** — The `optimize` flag is forwarded to Xacro (`xacro … optimize:=True/False`), which can toggle sensor update rates at model-generation time.
+3. **Control loops** — `control_rate_hz` is set to `5.0` Hz (optimize) vs `20.0` Hz (normal) for both `net_approach` and `phase3_inspection*` nodes.
+4. **Yaw filter** — `yaw_ema_alpha` is set to `1.0` (raw, no EMA) in optimize mode to reduce CPU load.
+
+### When to use it
+
+- **`optimize:=True`** → headless CI/CD runs, low-end laptops, or batch data collection where physics fidelity is secondary.
+- **`optimize:=False`** (default) → final validation, demos, or any run where sensor timing accuracy matters.

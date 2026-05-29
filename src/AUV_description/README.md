@@ -49,6 +49,8 @@ Spawns the robot in an open ocean environment featuring a large aquaculture net.
 ros2 launch AUV_description bluerov2_ocean_realistic.launch.py
 ```
 
+> **Note:** The launch files in `AUV_guidance` also accept an `optimize:=True` flag that dynamically patches the physics step size of the world file before loading it in Gazebo. See the [Performance / Optimize Mode](#5-performance--optimize-mode) section below for details.
+
 ---
 
 ## 3. Technical Architecture
@@ -89,3 +91,32 @@ If you are a developer taking over this project, here is how you can modify or i
 - **Adding New Sensors**: If you need a new camera or DVL, add the corresponding Gazebo sensor plugin block into the URDF. Make sure to bind it to a specific physical link on the robot.
 - **Tuning Sensor Noise**: If the EKF (localization) is struggling, you can adjust the noise variances in `imu_republisher.py` (`ORIENT_VAR`, `ANGVEL_VAR`, `LINACC_VAR`) or the standard deviation in `simulated_depth_sensor.py` to match the specs of your real-world hardware.
 - **Changing the Environment**: Modify the `.xml` files in the `world/` directory. You can add static objects (like rocks or cylinders) to test obstacle avoidance algorithms.
+
+---
+
+## 5. Performance / Optimize Mode
+
+The `AUV_guidance` launch files expose an `optimize` argument that acts on this package's world files at launch time. **No world file is modified on disk** — the patch is applied to a temporary copy.
+
+### What changes with `optimize:=True`
+
+| Parameter | Normal mode | Optimize mode |
+|---|---|---|
+| Gazebo `max_step_size` | `0.001` s (1 ms) | `0.006` s (6 ms) |
+| URDF sensor update rates | Full rate (via `xacro optimize:=false`) | Reduced rate (via `xacro optimize:=true`) |
+| Yaw EMA filter alpha (`yaw_ema_alpha`) | `1.0` (no smoothing) | `0.15` (smoothed) |
+
+### How it works (world patch)
+
+When `optimize:=True` is passed to a guidance launch file, the launch script:
+1. Reads the selected `.xml` world file from `AUV_description/world/`.
+2. Replaces the `<max_step_size>` value in memory using a regex substitution.
+3. Writes the modified content to a **temporary file** (`/tmp/gz_world_*.xml`).
+4. Passes that temporary file to Gazebo instead of the original.
+
+The original world files in `world/` are **never touched**.
+
+### When to use it
+
+- Use `optimize:=True` on **low-end machines** or when running **headless batch simulations** where real-time physics fidelity is less important than throughput.
+- Keep `optimize:=False` (default) for **final validation runs** or whenever sensor timing accuracy matters.
