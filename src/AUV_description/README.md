@@ -1,8 +1,10 @@
 # AUV Description
 
+> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+
 ## 1. Introduction for Beginners
 
-Welcome to the **AUV Description** package! This package defines the "body" and "senses" of our robot inside the virtual world (Gazebo). 
+Welcome to the **AUV Description** package! This package defines the "body" and "senses" of our robot inside the virtual world (Gazebo).
 
 Imagine building a video game character: you need to define its shape, how heavy it is, where its eyes (cameras) and ears (sonars) are located, and how it interacts with water. That is exactly what this package does. It holds the 3D models (meshes), the physical properties (weight, buoyancy), and the sensors (IMU, Sonar, Depth) for the BlueROV2. It also contains the simulated "worlds" (like a pool or the ocean with a fishing net) where the robot will dive.
 
@@ -13,7 +15,7 @@ Additionally, this package provides small helper scripts that take raw, perfect 
 ## 2. Quick Start Guide
 
 ### Prerequisites
-Make sure your ROS 2 workspace is sourced and built.
+Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
 
 ```bash
 cd ~/AUV_project/ros2_AUV
@@ -23,7 +25,7 @@ source install/setup.bash
 
 ### Launching the Simulated Environments
 
-This package primarily contains launch files to spawn the robot in different simulated worlds.
+This package contains launch files to spawn the robot in different simulated worlds.
 
 **1. Basic Pool Environment:**
 A simple, empty pool useful for testing basic movements and PID tuning.
@@ -38,18 +40,26 @@ ros2 launch AUV_description bluerov2_bassin_captors.launch.py
 ```
 
 **3. Pool with Waves:**
-Adds surface waves to the pool to test stability and station keeping.
+Adds surface waves to the pool. Requires `gz-waves` compiled separately (see Note below).
 ```bash
 ros2 launch AUV_description bluerov2_bassin_waves.launch.py
 ```
 
-**4. Ocean Environment (Net Inspection):**
+**4. Realistic Pool with Sensors (alternate config):**
+Alternate version of the realistic pool launch.
+```bash
+ros2 launch AUV_description bluerov2_realist_bassin.launch.py
+```
+
+**5. Ocean Environment (Net Inspection):**
 Spawns the robot in an open ocean environment featuring a large aquaculture net.
 ```bash
 ros2 launch AUV_description bluerov2_ocean_realistic.launch.py
 ```
 
-> **Note:** The launch files in `AUV_guidance` also accept an `optimize:=True` flag that dynamically patches the physics step size of the world file before loading it in Gazebo. See the [Performance / Optimize Mode](#5-performance--optimize-mode) section below for details.
+> **Note on wave simulation:** The `bluerov2_bassin_waves.launch.py` world requires the `gz-waves` plugin from `asv_wave_sim`. This package is excluded from the default `colcon build` (via `COLCON_IGNORE`) because it requires additional system dependencies (`libcgal-dev`, `libfftw3-dev`) and must be compiled with `GZ_VERSION=harmonic` set. The main net inspection missions do **not** require it.
+
+> **Note on optimize mode:** The launch files in `AUV_guidance` accept an `optimize:=True` flag that dynamically patches the physics step size of the world file before loading it in Gazebo. See the [Performance / Optimize Mode](#5-performance--optimize-mode) section below for details.
 
 ---
 

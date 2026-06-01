@@ -1,5 +1,7 @@
 # AUV Guidance
 
+> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+
 ## 1. Introduction for Beginners
 
 Welcome to the **AUV Guidance** package! Think of this package as the "brain" of the underwater robot (AUV). 
@@ -13,7 +15,7 @@ This package also contains important "bridges." Since a simulated robot and a re
 ## 2. Quick Start Guide
 
 ### Prerequisites
-Make sure your ROS 2 workspace is sourced and built.
+Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
 
 ```bash
 cd ~/AUV_project/ros2_AUV
@@ -118,7 +120,7 @@ Both launch files (`net_full_inspection.launch.py` and `net_inspection_big_net.l
 | Gazebo `max_step_size` | `0.001` s (1 ms) | `0.006` s (6 ms) |
 | URDF sensor update rates | Full rate | Reduced rate (via `xacro optimize:=true`) |
 | Mission control loop (`control_rate_hz`) | 20 Hz | 5 Hz |
-| Yaw EMA filter alpha (`yaw_ema_alpha`) | `0.15` (smoothed) | `1.0` (no smoothing) |
+| Yaw EMA filter alpha (`yaw_ema_alpha`) | `1.0` (no smoothing) | `0.15` (smoothed) |
 
 ### Affected launch files
 
@@ -132,7 +134,7 @@ Both launch files (`net_full_inspection.launch.py` and `net_inspection_big_net.l
 1. **Physics step** — The launch script reads the selected world `.xml`, patches `<max_step_size>` in memory with a regex, and writes the result to a temporary file. The original world files in `AUV_description/world/` are **never modified on disk**.
 2. **URDF sensors** — The `optimize` flag is forwarded to Xacro (`xacro … optimize:=True/False`), which can toggle sensor update rates at model-generation time.
 3. **Control loops** — `control_rate_hz` is set to `5.0` Hz (optimize) vs `20.0` Hz (normal) for both `net_approach` and `phase3_inspection*` nodes.
-4. **Yaw filter** — `yaw_ema_alpha` is set to `1.0` (raw, no EMA) in optimize mode to reduce CPU load.
+4. **Yaw filter** — `yaw_ema_alpha` is set to `0.15` (smoothed) in optimize mode to compensate for the low rate of the sonar.
 
 ### When to use it
 

@@ -1,5 +1,7 @@
 # AUV Perception
 
+> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+
 ## 1. Introduction for Beginners
 
 Welcome to the **AUV Perception** package! This package acts as the "eyes and memory" of the underwater robot.
@@ -14,7 +16,7 @@ When the robot swims around the aquaculture net, it receives thousands of data p
 ## 2. Quick Start Guide
 
 ### Prerequisites
-Make sure your ROS 2 workspace is sourced and built.
+Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
 
 ```bash
 cd ~/AUV_project/ros2_AUV
