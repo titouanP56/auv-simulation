@@ -1,10 +1,10 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-from launch.substitutions import Command
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
@@ -29,11 +29,22 @@ def generate_launch_description():
     xacro_file = Command(['xacro ', urdf_file])
 
     # 1. Start Gazebo Sim
+    headless_arg = DeclareLaunchArgument(
+        'headless',
+        default_value='False',
+        description='Run Gazebo without a GUI (server-only). True | False',
+    )
+    headless = LaunchConfiguration('headless')
+
+    gz_args = PythonExpression([
+        "'-r ", sdf_file, " -s' if ", headless, " else '-r ", sdf_file, "'"
+    ])
+
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={'gz_args': f'-r {sdf_file}'}.items(),
+        launch_arguments={'gz_args': gz_args}.items(),
     )
 
     # 2. Spawn the robot model in Gazebo
@@ -63,12 +74,16 @@ def generate_launch_description():
     bridge_remappings.append(('/model/BlueROV2/odometry', '/odom'))
 
     # Add Camera Image bridge
-    bridge_args.append('/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image')
-    bridge_remappings.append(('/camera/image_raw', '/camera/image_raw'))
+    #bridge_args.append('/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image')
+    #bridge_remappings.append(('/camera/image_raw', '/camera/image_raw'))
 
     # Add Clock bridge (Essential for use_sim_time synchronization)
     bridge_args.append('/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock')
     bridge_remappings.append(('/clock', '/clock'))
+
+    # Bridge for World Statistics (Real time, Sim time, RTF)
+    bridge_args.append('/world/mclab_basin/stats@ros_gz_interfaces/msg/WorldStatistics[gz.msgs.WorldStatistics')
+    bridge_remappings.append(('/world/mclab_basin/stats', '/world/stats'))
 
     # Add Ping360 Sonar bridge (Gazebo gpu_lidar -> ROS 2 LaserScan)
     bridge_args.append('/ping360/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan')
@@ -174,6 +189,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        headless_arg,
         gz_resource_path,
         gz_sim,
         create_entity,
@@ -186,4 +202,11 @@ def generate_launch_description():
         ping360_tf,
         imu_tf,
         sonoptix_tf,
+        Node(
+            package='AUV_description',
+            executable='rtf_monitor',
+            name='rtf_monitor',
+            output='screen',
+            parameters=[{'use_sim_time': True}]
+        ),
     ])

@@ -3,6 +3,14 @@
 #include <gz/transport/Node.hh>
 #include <gz/msgs/dvl_velocity_tracking.pb.h>
 
+/**
+ * @class DvlBridgeNode
+ * @brief ROS 2 Node bridging Gazebo DVL messages to ROS 2 Twist messages.
+ * 
+ * Subscribes to Gazebo transport topic `/dvl/velocity` (protobuf) and converts it 
+ * to a ROS 2 `geometry_msgs/msg/TwistWithCovarianceStamped` on `/dvl/velocity_ros`.
+ * This allows the ROS 2 EKF to consume simulated DVL velocity data.
+ */
 class DvlBridgeNode : public rclcpp::Node
 {
 public:

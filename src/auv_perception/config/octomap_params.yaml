@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    frame_id: "odom"
+    base_frame_id: "base_link"
+    resolution: 0.1
+    occupancy_max_z: -0.5
+    sensor_model:
+      max_range: 5.0

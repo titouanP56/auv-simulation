@@ -1,69 +1,77 @@
-# my_auv_localization
+# AUV Localization
 
-ROS2 package for AUV state estimation using an Extended Kalman Filter (EKF). It fuses data from the DVL, IMU and depth sensor to produce a smooth, reliable 6-DOF pose estimate.
+> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
 
-## Contents
+## 1. Introduction for Beginners
 
-```
-my_auv_localization/
-├── config/
-│   └── ekf.yaml            # EKF configuration (sensors, noise covariance)
-└── launch/
-    └── localization.launch.py  # Launches the EKF node
-```
+Welcome to the **AUV Localization** package! This package answers the most important question for any robot: *"Where am I?"*
 
-## How it works
+Underwater, GPS doesn't work. To figure out where it is, the robot uses an **Extended Kalman Filter (EKF)**. You can think of the EKF as a very smart detective that constantly gathers clues from different sensors:
+- **The DVL (Doppler Velocity Log)** tells it how fast it's swimming.
+- **The Depth Sensor** tells it how deep it is.
+- **The IMU (Inertial Measurement Unit)** acts like its inner ear, telling it how it's tilting and turning.
 
-The package relies on the standard `robot_localization` EKF node. Three sensor sources are fused:
+By combining all these clues, the EKF creates a smooth, reliable estimate of the robot's exact position and orientation in the water, which the controllers use to navigate.
 
-| Source | Topic | Data used |
-|---|---|---|
-| IMU | `/imu/fixed` | Angular velocity (roll/pitch/yaw rates) |
-| DVL | `/dvl/velocity_ros` | Linear velocity (Vx, Vy, Vz) in `base_link` frame |
-| Depth sensor | `/depth/pose` | Absolute Z position |
+---
 
-The filter outputs the estimated pose on `/odometry/filtered`, which is consumed by the MPC controller.
+## 2. Quick Start Guide
 
-## EKF Configuration (`ekf.yaml`)
-
-| Parameter | Value |
-|---|---|
-| Filter frequency | 30 Hz |
-| Sensor timeout | 0.1 s |
-| 3D mode | Yes (`two_d_mode: false`) |
-| World frame | `odom` |
-| Base frame | `base_link` |
-
-### Sensor fusion details
-
-- **IMU** (`/imu/fixed`): only angular velocities are fused. Orientation is disabled to avoid initial heading offset issues. `imu0_relative: true`.
-- **DVL** (`/dvl/velocity_ros`): linear velocities (Vx, Vy, Vz) are fused in the robot body frame (`twist_body: true`). Provided by the `auv_dvl_bridge` package.
-- **Depth** (`/depth/pose`): only the Z position is fused, giving an absolute depth reference.
-
-## Topics
-
-| Topic | Type | Role |
-|---|---|---|
-| `/imu/fixed` | `sensor_msgs/Imu` | Input — IMU angular velocities |
-| `/dvl/velocity_ros` | `geometry_msgs/TwistWithCovarianceStamped` | Input — DVL linear velocities |
-| `/depth/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Input — absolute depth |
-| `/odometry/filtered` | `nav_msgs/Odometry` | Output — filtered 6-DOF pose |
-| `/tf` | TF tree | Output — `odom` → `base_link` transform |
-
-## Launch
+### Prerequisites
+Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
 
 ```bash
-# Standalone
-ros2 launch my_auv_localization localization.launch.py
-
-# Typically included in the main simulation launch
-ros2 launch AUV_description bluerov2_bassin_captors.launch.py
+cd ~/AUV_project/ros2_AUV
+colcon build --packages-select my_auv_localization
+source install/setup.bash
 ```
 
-> **Note:** `use_sim_time: true` is set by default. The node synchronises with Gazebo's simulation clock via the `/clock` topic.
+### Running the Localization Filter
 
-## Dependencies
+This package is usually launched automatically along with the simulation. To run it manually:
 
-- [`robot_localization`](https://docs.ros.org/en/humble/p/robot_localization/) — EKF/UKF state estimation
-- `auv_dvl_bridge` — DVL bridge (same workspace)
-- `AUV_description` — provides the `simulated_depth_sensor` node
+```bash
+ros2 launch my_auv_localization localization.launch.py
+```
+
+You can verify the filter is working by looking at the smoothed odometry:
+```bash
+ros2 topic echo /odometry/filtered
+```
+
+---
+
+## 3. Technical Architecture
+
+This package is a configuration wrapper around the standard `robot_localization` ROS 2 package. It configures a 3D Extended Kalman Filter to fuse our specific sensor setup.
+
+### Sensor Fusion Setup (`config/ekf.yaml`)
+
+- **Filter Frequency**: 30 Hz
+- **3D Mode**: Enabled (`two_d_mode: false`)
+- **World Frame**: `odom`
+- **Base Frame**: `base_link`
+
+**Inputs:**
+1. **IMU** (`/imu/fixed`): Only angular velocities (roll/pitch/yaw rates) are fused. Absolute orientation is disabled to avoid initial heading offset issues in the simulator.
+2. **DVL** (`/dvl/velocity_ros`): Linear velocities ($V_x, V_y, V_z$) are fused in the robot body frame (`twist_body: true`).
+3. **Depth** (`/depth/pose`): Only the absolute $Z$ position is fused, anchoring the robot vertically.
+
+### Subscribed Topics
+- `/imu/fixed` (`sensor_msgs/Imu`): Cleaned IMU data.
+- `/dvl/velocity_ros` (`geometry_msgs/TwistWithCovarianceStamped`): Cleaned DVL data.
+- `/depth/pose` (`geometry_msgs/PoseWithCovarianceStamped`): Simulated depth sensor data.
+
+### Published Topics
+- `/odometry/filtered` (`nav_msgs/Odometry`): Smooth, continuous 6-DOF pose estimate.
+- `/tf`: Broadcasts the dynamic transform from `odom` → `base_link`.
+
+---
+
+## 4. Maintenance Guide
+
+If you are a developer tuning the robot's localization:
+
+- **Tuning the EKF**: Open `config/ekf.yaml`. The matrices (`process_noise_covariance`, `initial_estimate_covariance`) define how much the filter trusts its own mathematical model vs. the sensors. If the robot "jumps" around, you might need to adjust the sensor covariances in the bridge nodes.
+- **Adding a Sensor**: If you add a new sensor (like an underwater USBL or visual odometry), add a new block to `ekf.yaml` (e.g., `pose1: /usbl/pose`) and define which of the 15 variables (x, y, z, roll, pitch, yaw, etc.) the filter should ingest from that sensor by modifying the `[false, false, ...]` boolean array.
+- **Simulation Time**: The launch file defaults to `use_sim_time: true`. If you run this on real hardware, ensure this is set to `false`.

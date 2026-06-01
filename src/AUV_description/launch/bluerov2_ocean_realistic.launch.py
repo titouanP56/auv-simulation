@@ -1,11 +1,24 @@
 import os
+import math
+import random
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-from launch.substitutions import Command
+from launch.substitutions import Command, LaunchConfiguration
+from launch.actions import DeclareLaunchArgument
 from launch_ros.parameter_descriptions import ParameterValue
+
+# ── Phase 1: Random Spawn helper ─────────────────────────────────────────────
+def _random_spawn_in_circle(radius: float):
+    """Return (x, y) uniformly sampled inside a circle of given radius."""
+    while True:
+        x = random.uniform(-radius, radius)
+        y = random.uniform(-radius, radius)
+        if math.hypot(x, y) <= radius:
+            return x, y
+
 
 def generate_launch_description():
     """
@@ -36,16 +49,55 @@ def generate_launch_description():
         launch_arguments={'gz_args': f'-r {sdf_file}'}.items(),
     )
 
+    # ── Phase 1: sample a random realistic spawn pose ─────────────────────────
+    # Net diameter = ~25 m radius; AUV can drop anywhere within 20 m of center.
+    #NET_SPAWN_RADIUS = 20.0   # [m] max distance from net center
+    #NET_CENTER_X     = 0.0    # [m] net center in world frame (adjust if needed)
+    #NET_CENTER_Y     = 0.0    # [m] net center in world frame (adjust if needed)
+
+    #spawn_dx, spawn_dy = _random_spawn_in_circle(NET_SPAWN_RADIUS)
+    #spawn_x   = NET_CENTER_X + spawn_dx
+    #spawn_y   = NET_CENTER_Y + spawn_dy
+
+# Constantes
+    NET_SPAWN_RADIUS = 22.0   # Rayon fixe
+    NET_CENTER_X     = 0.0
+    NET_CENTER_Y     = 0.0
+
+# 1. On choisit un angle aléatoire entre 0 et 2*PI
+    angle = random.uniform(0, 2 * math.pi)
+
+# 2. On calcule la position sur la circonférence
+    spawn_dx = NET_SPAWN_RADIUS * math.cos(angle)
+    spawn_dy = NET_SPAWN_RADIUS * math.sin(angle)
+
+# 3. Position finale dans le monde
+    spawn_x = NET_CENTER_X + spawn_dx
+    spawn_y = NET_CENTER_Y + spawn_dy
+
+
+    spawn_z   = random.uniform(-0.5, 0.0)           # near surface
+    spawn_yaw = random.uniform(-math.pi, math.pi)   # fully random heading
+
+    print(f"[Phase 1] Spawn pose: x={spawn_x:.2f} y={spawn_y:.2f} "
+          f"z={spawn_z:.2f} yaw={math.degrees(spawn_yaw):.1f}°")
+
     # 2. Spawn the robot model in Gazebo
     create_entity = Node(
         package='ros_gz_sim',
         executable='create',
-        arguments=['-topic', 'robot_description',
-                   '-name', 'BlueROV2',
-                   '-string', xacro_file,
-                   '-z', '-0.3'], # Spawn slightly underwater to avoid floor collision if any
+        arguments=[
+            '-topic', 'robot_description',
+            '-name',  'BlueROV2',
+            '-string', xacro_file,
+            '-x', str(spawn_x),
+            '-y', str(spawn_y),
+            '-z', str(spawn_z),
+            '-Y', str(spawn_yaw),  # Yaw angle (radians) — sets initial heading
+        ],
         output='screen'
     )
+
 
     # 3. Setup bridges between Gazebo (gz) and ROS 2
     bridge_args = []
@@ -167,10 +219,24 @@ def generate_launch_description():
     )
 
     # ── Gazebo Resource Path ─────────────────────────────────────────────
-    from launch.actions import SetEnvironmentVariable
+    from launch.actions import SetEnvironmentVariable, TimerAction
     gz_resource_path = SetEnvironmentVariable(
         name='GZ_SIM_RESOURCE_PATH',
         value=[os.path.join(get_package_share_directory('AUV_description'), '..')]
+    )
+
+    # 7. Net Approach Node (delayed: wait for Gazebo + EKF to be ready)
+    net_approach = TimerAction(
+        period=5.0,  # [s] give Gazebo, bridge, and EKF time to start
+        actions=[
+            Node(
+                package='AUV_guidance',
+                executable='net_approach',
+                name='net_approach',
+                output='screen',
+                parameters=[{'use_sim_time': True}],
+            )
+        ]
     )
 
     return LaunchDescription([
@@ -186,4 +252,5 @@ def generate_launch_description():
         ping360_tf,
         imu_tf,
         sonoptix_tf,
+        net_approach,   # Net approach: delayed start
     ])

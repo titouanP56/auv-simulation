@@ -30,6 +30,7 @@ setup(
             'mpc_controller_sensors = AUV_controller.mpc_controller_sensors:main',
             'mpc_controller_realistic = AUV_controller.mpc_controller_realistic:main',
             'station_keeping = AUV_controller.station_keeping:main',
+            'mpc_controller_net_inspection = AUV_controller.mpc_controller_net_inspection:main',
         ],
     },
 )

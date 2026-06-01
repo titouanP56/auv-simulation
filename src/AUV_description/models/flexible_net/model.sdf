@@ -1,0 +1,5863 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="flexible_net">
+    <link name="base_ring">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>1000.0</mass>
+        <inertia>
+          <ixx>1000.0</ixx>
+          <iyy>1000.0</iyy>
+          <izz>1000.0</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="base_to_world" type="fixed">
+      <parent>world</parent>
+      <child>base_ring</child>
+    </joint>
+    <link name="panel_0_cyl_1">
+      <pose>25.0000 0.0000 -2.5000 0 0 0.0000</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_0_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_0_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_0_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_0_cyl_2">
+      <pose>25.0000 0.0000 -7.5000 0 0 0.0000</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_0_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_0_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_0_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_0_cyl_3">
+      <pose>25.0000 0.0000 -12.5000 0 0 0.0000</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_0_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_0_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_0_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_0_cone_1">
+      <pose>18.7500 0.0000 -18.7500 0 1.0304 0.0000</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_0_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_0_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_0_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_0_cone_2">
+      <pose>6.2500 0.0000 -26.2500 0 1.0304 0.0000</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_0_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_0_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_0_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_0_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_0_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_0_cyl1_cyl2" type="universal">
+      <parent>panel_0_cyl_1</parent>
+      <child>panel_0_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_0_cyl2_cyl3" type="universal">
+      <parent>panel_0_cyl_2</parent>
+      <child>panel_0_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_0_cyl3_cone1" type="universal">
+      <parent>panel_0_cyl_3</parent>
+      <child>panel_0_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_0_cone1_cone2" type="universal">
+      <parent>panel_0_cone_1</parent>
+      <child>panel_0_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_1_cyl_1">
+      <pose>23.0970 9.5671 -2.5000 0 0 0.3927</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_1_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_1_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_1_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_1_cyl_2">
+      <pose>23.0970 9.5671 -7.5000 0 0 0.3927</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_1_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_1_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_1_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_1_cyl_3">
+      <pose>23.0970 9.5671 -12.5000 0 0 0.3927</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_1_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_1_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_1_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_1_cone_1">
+      <pose>17.3227 7.1753 -18.7500 0 1.0304 0.3927</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_1_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_1_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_1_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_1_cone_2">
+      <pose>5.7742 2.3918 -26.2500 0 1.0304 0.3927</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_1_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_1_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_1_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_1_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_1_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_1_cyl1_cyl2" type="universal">
+      <parent>panel_1_cyl_1</parent>
+      <child>panel_1_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_1_cyl2_cyl3" type="universal">
+      <parent>panel_1_cyl_2</parent>
+      <child>panel_1_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_1_cyl3_cone1" type="universal">
+      <parent>panel_1_cyl_3</parent>
+      <child>panel_1_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_1_cone1_cone2" type="universal">
+      <parent>panel_1_cone_1</parent>
+      <child>panel_1_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_2_cyl_1">
+      <pose>17.6777 17.6777 -2.5000 0 0 0.7854</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_2_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_2_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_2_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_2_cyl_2">
+      <pose>17.6777 17.6777 -7.5000 0 0 0.7854</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_2_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_2_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_2_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_2_cyl_3">
+      <pose>17.6777 17.6777 -12.5000 0 0 0.7854</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_2_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_2_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_2_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_2_cone_1">
+      <pose>13.2583 13.2583 -18.7500 0 1.0304 0.7854</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_2_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_2_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_2_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_2_cone_2">
+      <pose>4.4194 4.4194 -26.2500 0 1.0304 0.7854</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_2_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_2_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_2_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_2_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_2_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_2_cyl1_cyl2" type="universal">
+      <parent>panel_2_cyl_1</parent>
+      <child>panel_2_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_2_cyl2_cyl3" type="universal">
+      <parent>panel_2_cyl_2</parent>
+      <child>panel_2_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_2_cyl3_cone1" type="universal">
+      <parent>panel_2_cyl_3</parent>
+      <child>panel_2_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_2_cone1_cone2" type="universal">
+      <parent>panel_2_cone_1</parent>
+      <child>panel_2_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_3_cyl_1">
+      <pose>9.5671 23.0970 -2.5000 0 0 1.1781</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_3_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_3_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_3_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_3_cyl_2">
+      <pose>9.5671 23.0970 -7.5000 0 0 1.1781</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_3_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_3_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_3_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_3_cyl_3">
+      <pose>9.5671 23.0970 -12.5000 0 0 1.1781</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_3_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_3_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_3_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_3_cone_1">
+      <pose>7.1753 17.3227 -18.7500 0 1.0304 1.1781</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_3_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_3_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_3_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_3_cone_2">
+      <pose>2.3918 5.7742 -26.2500 0 1.0304 1.1781</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_3_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_3_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_3_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_3_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_3_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_3_cyl1_cyl2" type="universal">
+      <parent>panel_3_cyl_1</parent>
+      <child>panel_3_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_3_cyl2_cyl3" type="universal">
+      <parent>panel_3_cyl_2</parent>
+      <child>panel_3_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_3_cyl3_cone1" type="universal">
+      <parent>panel_3_cyl_3</parent>
+      <child>panel_3_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_3_cone1_cone2" type="universal">
+      <parent>panel_3_cone_1</parent>
+      <child>panel_3_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_4_cyl_1">
+      <pose>0.0000 25.0000 -2.5000 0 0 1.5708</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_4_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_4_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_4_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_4_cyl_2">
+      <pose>0.0000 25.0000 -7.5000 0 0 1.5708</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_4_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_4_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_4_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_4_cyl_3">
+      <pose>0.0000 25.0000 -12.5000 0 0 1.5708</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_4_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_4_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_4_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_4_cone_1">
+      <pose>0.0000 18.7500 -18.7500 0 1.0304 1.5708</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_4_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_4_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_4_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_4_cone_2">
+      <pose>0.0000 6.2500 -26.2500 0 1.0304 1.5708</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_4_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_4_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_4_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_4_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_4_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_4_cyl1_cyl2" type="universal">
+      <parent>panel_4_cyl_1</parent>
+      <child>panel_4_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_4_cyl2_cyl3" type="universal">
+      <parent>panel_4_cyl_2</parent>
+      <child>panel_4_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_4_cyl3_cone1" type="universal">
+      <parent>panel_4_cyl_3</parent>
+      <child>panel_4_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_4_cone1_cone2" type="universal">
+      <parent>panel_4_cone_1</parent>
+      <child>panel_4_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_5_cyl_1">
+      <pose>-9.5671 23.0970 -2.5000 0 0 1.9635</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_5_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_5_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_5_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_5_cyl_2">
+      <pose>-9.5671 23.0970 -7.5000 0 0 1.9635</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_5_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_5_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_5_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_5_cyl_3">
+      <pose>-9.5671 23.0970 -12.5000 0 0 1.9635</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_5_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_5_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_5_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_5_cone_1">
+      <pose>-7.1753 17.3227 -18.7500 0 1.0304 1.9635</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_5_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_5_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_5_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_5_cone_2">
+      <pose>-2.3918 5.7742 -26.2500 0 1.0304 1.9635</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_5_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_5_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_5_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_5_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_5_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_5_cyl1_cyl2" type="universal">
+      <parent>panel_5_cyl_1</parent>
+      <child>panel_5_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_5_cyl2_cyl3" type="universal">
+      <parent>panel_5_cyl_2</parent>
+      <child>panel_5_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_5_cyl3_cone1" type="universal">
+      <parent>panel_5_cyl_3</parent>
+      <child>panel_5_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_5_cone1_cone2" type="universal">
+      <parent>panel_5_cone_1</parent>
+      <child>panel_5_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_6_cyl_1">
+      <pose>-17.6777 17.6777 -2.5000 0 0 2.3562</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_6_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_6_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_6_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_6_cyl_2">
+      <pose>-17.6777 17.6777 -7.5000 0 0 2.3562</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_6_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_6_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_6_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_6_cyl_3">
+      <pose>-17.6777 17.6777 -12.5000 0 0 2.3562</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_6_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_6_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_6_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_6_cone_1">
+      <pose>-13.2583 13.2583 -18.7500 0 1.0304 2.3562</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_6_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_6_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_6_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_6_cone_2">
+      <pose>-4.4194 4.4194 -26.2500 0 1.0304 2.3562</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_6_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_6_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_6_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_6_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_6_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_6_cyl1_cyl2" type="universal">
+      <parent>panel_6_cyl_1</parent>
+      <child>panel_6_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_6_cyl2_cyl3" type="universal">
+      <parent>panel_6_cyl_2</parent>
+      <child>panel_6_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_6_cyl3_cone1" type="universal">
+      <parent>panel_6_cyl_3</parent>
+      <child>panel_6_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_6_cone1_cone2" type="universal">
+      <parent>panel_6_cone_1</parent>
+      <child>panel_6_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_7_cyl_1">
+      <pose>-23.0970 9.5671 -2.5000 0 0 2.7489</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_7_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_7_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_7_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_7_cyl_2">
+      <pose>-23.0970 9.5671 -7.5000 0 0 2.7489</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_7_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_7_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_7_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_7_cyl_3">
+      <pose>-23.0970 9.5671 -12.5000 0 0 2.7489</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_7_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_7_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_7_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_7_cone_1">
+      <pose>-17.3227 7.1753 -18.7500 0 1.0304 2.7489</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_7_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_7_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_7_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_7_cone_2">
+      <pose>-5.7742 2.3918 -26.2500 0 1.0304 2.7489</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_7_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_7_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_7_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_7_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_7_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_7_cyl1_cyl2" type="universal">
+      <parent>panel_7_cyl_1</parent>
+      <child>panel_7_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_7_cyl2_cyl3" type="universal">
+      <parent>panel_7_cyl_2</parent>
+      <child>panel_7_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_7_cyl3_cone1" type="universal">
+      <parent>panel_7_cyl_3</parent>
+      <child>panel_7_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_7_cone1_cone2" type="universal">
+      <parent>panel_7_cone_1</parent>
+      <child>panel_7_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_8_cyl_1">
+      <pose>-25.0000 0.0000 -2.5000 0 0 3.1416</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_8_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_8_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_8_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_8_cyl_2">
+      <pose>-25.0000 0.0000 -7.5000 0 0 3.1416</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_8_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_8_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_8_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_8_cyl_3">
+      <pose>-25.0000 0.0000 -12.5000 0 0 3.1416</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_8_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_8_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_8_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_8_cone_1">
+      <pose>-18.7500 0.0000 -18.7500 0 1.0304 3.1416</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_8_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_8_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_8_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_8_cone_2">
+      <pose>-6.2500 0.0000 -26.2500 0 1.0304 3.1416</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_8_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_8_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_8_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_8_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_8_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_8_cyl1_cyl2" type="universal">
+      <parent>panel_8_cyl_1</parent>
+      <child>panel_8_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_8_cyl2_cyl3" type="universal">
+      <parent>panel_8_cyl_2</parent>
+      <child>panel_8_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_8_cyl3_cone1" type="universal">
+      <parent>panel_8_cyl_3</parent>
+      <child>panel_8_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_8_cone1_cone2" type="universal">
+      <parent>panel_8_cone_1</parent>
+      <child>panel_8_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_9_cyl_1">
+      <pose>-23.0970 -9.5671 -2.5000 0 0 3.5343</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_9_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_9_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_9_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_9_cyl_2">
+      <pose>-23.0970 -9.5671 -7.5000 0 0 3.5343</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_9_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_9_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_9_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_9_cyl_3">
+      <pose>-23.0970 -9.5671 -12.5000 0 0 3.5343</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_9_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_9_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_9_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_9_cone_1">
+      <pose>-17.3227 -7.1753 -18.7500 0 1.0304 3.5343</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_9_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_9_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_9_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_9_cone_2">
+      <pose>-5.7742 -2.3918 -26.2500 0 1.0304 3.5343</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_9_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_9_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_9_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_9_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_9_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_9_cyl1_cyl2" type="universal">
+      <parent>panel_9_cyl_1</parent>
+      <child>panel_9_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_9_cyl2_cyl3" type="universal">
+      <parent>panel_9_cyl_2</parent>
+      <child>panel_9_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_9_cyl3_cone1" type="universal">
+      <parent>panel_9_cyl_3</parent>
+      <child>panel_9_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_9_cone1_cone2" type="universal">
+      <parent>panel_9_cone_1</parent>
+      <child>panel_9_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_10_cyl_1">
+      <pose>-17.6777 -17.6777 -2.5000 0 0 3.9270</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_10_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_10_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_10_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_10_cyl_2">
+      <pose>-17.6777 -17.6777 -7.5000 0 0 3.9270</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_10_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_10_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_10_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_10_cyl_3">
+      <pose>-17.6777 -17.6777 -12.5000 0 0 3.9270</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_10_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_10_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_10_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_10_cone_1">
+      <pose>-13.2583 -13.2583 -18.7500 0 1.0304 3.9270</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_10_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_10_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_10_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_10_cone_2">
+      <pose>-4.4194 -4.4194 -26.2500 0 1.0304 3.9270</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_10_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_10_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_10_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_10_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_10_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_10_cyl1_cyl2" type="universal">
+      <parent>panel_10_cyl_1</parent>
+      <child>panel_10_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_10_cyl2_cyl3" type="universal">
+      <parent>panel_10_cyl_2</parent>
+      <child>panel_10_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_10_cyl3_cone1" type="universal">
+      <parent>panel_10_cyl_3</parent>
+      <child>panel_10_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_10_cone1_cone2" type="universal">
+      <parent>panel_10_cone_1</parent>
+      <child>panel_10_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_11_cyl_1">
+      <pose>-9.5671 -23.0970 -2.5000 0 0 4.3197</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_11_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_11_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_11_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_11_cyl_2">
+      <pose>-9.5671 -23.0970 -7.5000 0 0 4.3197</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_11_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_11_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_11_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_11_cyl_3">
+      <pose>-9.5671 -23.0970 -12.5000 0 0 4.3197</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_11_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_11_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_11_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_11_cone_1">
+      <pose>-7.1753 -17.3227 -18.7500 0 1.0304 4.3197</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_11_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_11_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_11_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_11_cone_2">
+      <pose>-2.3918 -5.7742 -26.2500 0 1.0304 4.3197</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_11_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_11_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_11_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_11_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_11_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_11_cyl1_cyl2" type="universal">
+      <parent>panel_11_cyl_1</parent>
+      <child>panel_11_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_11_cyl2_cyl3" type="universal">
+      <parent>panel_11_cyl_2</parent>
+      <child>panel_11_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_11_cyl3_cone1" type="universal">
+      <parent>panel_11_cyl_3</parent>
+      <child>panel_11_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_11_cone1_cone2" type="universal">
+      <parent>panel_11_cone_1</parent>
+      <child>panel_11_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_12_cyl_1">
+      <pose>-0.0000 -25.0000 -2.5000 0 0 4.7124</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_12_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_12_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_12_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_12_cyl_2">
+      <pose>-0.0000 -25.0000 -7.5000 0 0 4.7124</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_12_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_12_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_12_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_12_cyl_3">
+      <pose>-0.0000 -25.0000 -12.5000 0 0 4.7124</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_12_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_12_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_12_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_12_cone_1">
+      <pose>-0.0000 -18.7500 -18.7500 0 1.0304 4.7124</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_12_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_12_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_12_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_12_cone_2">
+      <pose>-0.0000 -6.2500 -26.2500 0 1.0304 4.7124</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_12_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_12_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_12_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_12_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_12_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_12_cyl1_cyl2" type="universal">
+      <parent>panel_12_cyl_1</parent>
+      <child>panel_12_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_12_cyl2_cyl3" type="universal">
+      <parent>panel_12_cyl_2</parent>
+      <child>panel_12_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_12_cyl3_cone1" type="universal">
+      <parent>panel_12_cyl_3</parent>
+      <child>panel_12_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_12_cone1_cone2" type="universal">
+      <parent>panel_12_cone_1</parent>
+      <child>panel_12_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_13_cyl_1">
+      <pose>9.5671 -23.0970 -2.5000 0 0 5.1051</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_13_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_13_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_13_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_13_cyl_2">
+      <pose>9.5671 -23.0970 -7.5000 0 0 5.1051</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_13_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_13_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_13_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_13_cyl_3">
+      <pose>9.5671 -23.0970 -12.5000 0 0 5.1051</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_13_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_13_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_13_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_13_cone_1">
+      <pose>7.1753 -17.3227 -18.7500 0 1.0304 5.1051</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_13_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_13_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_13_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_13_cone_2">
+      <pose>2.3918 -5.7742 -26.2500 0 1.0304 5.1051</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_13_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_13_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_13_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_13_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_13_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_13_cyl1_cyl2" type="universal">
+      <parent>panel_13_cyl_1</parent>
+      <child>panel_13_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_13_cyl2_cyl3" type="universal">
+      <parent>panel_13_cyl_2</parent>
+      <child>panel_13_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_13_cyl3_cone1" type="universal">
+      <parent>panel_13_cyl_3</parent>
+      <child>panel_13_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_13_cone1_cone2" type="universal">
+      <parent>panel_13_cone_1</parent>
+      <child>panel_13_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_14_cyl_1">
+      <pose>17.6777 -17.6777 -2.5000 0 0 5.4978</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_14_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_14_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_14_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_14_cyl_2">
+      <pose>17.6777 -17.6777 -7.5000 0 0 5.4978</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_14_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_14_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_14_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_14_cyl_3">
+      <pose>17.6777 -17.6777 -12.5000 0 0 5.4978</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_14_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_14_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_14_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_14_cone_1">
+      <pose>13.2583 -13.2583 -18.7500 0 1.0304 5.4978</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_14_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_14_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_14_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_14_cone_2">
+      <pose>4.4194 -4.4194 -26.2500 0 1.0304 5.4978</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_14_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_14_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_14_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_14_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_14_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_14_cyl1_cyl2" type="universal">
+      <parent>panel_14_cyl_1</parent>
+      <child>panel_14_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_14_cyl2_cyl3" type="universal">
+      <parent>panel_14_cyl_2</parent>
+      <child>panel_14_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_14_cyl3_cone1" type="universal">
+      <parent>panel_14_cyl_3</parent>
+      <child>panel_14_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_14_cone1_cone2" type="universal">
+      <parent>panel_14_cone_1</parent>
+      <child>panel_14_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <link name="panel_15_cyl_1">
+      <pose>23.0970 -9.5671 -2.5000 0 0 5.8905</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_15_cyl_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_15_cyl_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_15_cyl_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_15_cyl_2">
+      <pose>23.0970 -9.5671 -7.5000 0 0 5.8905</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_15_cyl_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_15_cyl_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_15_cyl_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_15_cyl_3">
+      <pose>23.0970 -9.5671 -12.5000 0 0 5.8905</pose>
+      <inertial>
+        <mass>50.0000</mass>
+        <inertia>
+          <ixx>104.6667</ixx>
+          <iyy>104.6667</iyy>
+          <izz>1.0000</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_15_cyl_3_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_15_cyl_3_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>5.0000</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_15_cyl_3</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_15_cone_1">
+      <pose>17.3227 -7.1753 -18.7500 0 1.0304 5.8905</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_15_cone_1_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_15_cone_1_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_15_cone_1</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <link name="panel_15_cone_2">
+      <pose>5.7742 -2.3918 -26.2500 0 1.0304 5.8905</pose>
+      <inertial>
+        <mass>145.7738</mass>
+        <inertia>
+          <ixx>2582.8687</ixx>
+          <iyy>2582.8687</iyy>
+          <izz>2.9155</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="panel_15_cone_2_col">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="panel_15_cone_2_vis">
+        <geometry>
+          <cylinder>
+            <radius>0.2000</radius>
+            <length>14.5774</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+        <link_name>panel_15_cone_2</link_name>
+        <xDotU>-10</xDotU>
+        <yDotV>-10</yDotV>
+        <zDotW>-2</zDotW>
+        <xUabsU>-50</xUabsU>
+        <yVabsV>-50</yVabsV>
+        <zWabsW>-10</zWabsW>
+      </plugin>
+    </link>
+    <joint name="j_15_base_cyl1" type="universal">
+      <parent>base_ring</parent>
+      <child>panel_15_cyl_1</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_15_cyl1_cyl2" type="universal">
+      <parent>panel_15_cyl_1</parent>
+      <child>panel_15_cyl_2</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_15_cyl2_cyl3" type="universal">
+      <parent>panel_15_cyl_2</parent>
+      <child>panel_15_cyl_3</child>
+      <pose>0 0 2.5000 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_15_cyl3_cone1" type="universal">
+      <parent>panel_15_cyl_3</parent>
+      <child>panel_15_cone_1</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+    <joint name="j_15_cone1_cone2" type="universal">
+      <parent>panel_15_cone_1</parent>
+      <child>panel_15_cone_2</child>
+      <pose>0 0 7.2887 0 0 0</pose>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis>
+      <axis2>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.0</lower>
+          <upper>1.0</upper>
+        </limit>
+        <dynamics>
+          <damping>500.0</damping>
+          <friction>10.0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>1000.0</spring_stiffness>
+        </dynamics>
+      </axis2>
+    </joint>
+  </model>
+</sdf>

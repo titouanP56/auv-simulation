@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <!-- A model of a 40m deep ocean world. Water is below 0m on z axis, air above. Water density is 1025 kg/m^3. -->
 <sdf version="1.8">
-  <world name="ocean_40m">
+  <world name="small_net_current">
 
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
@@ -91,32 +91,33 @@
     <!-- Net Model (FBX) -->
     <model name="fish_net">
       <static>true</static>
+      <!-- Position du filet (x, y, z, roll, pitch, yaw) -->
+      <!-- Si le haut est vers la gauche (axe -Y), on tourne de 90° (1.5708 rad) sur l'axe X (roll) -->
+      <!-- Si le haut est sur l'axe -X, on tourne sur l'axe Y (pitch) -->
       <pose>0 0 0 0 0 0</pose>
       <link name="net_link">
         <visual name="net_visual">
           <pose>0 0 0 1.5708 0 0</pose>
           <geometry>
             <mesh>
-              <uri>package://AUV_description/models/fish_net/meshes/plain.fbx</uri>
-              <scale>0.05 0.05 0.05</scale>
+              <!-- Utilisation du chemin relatif au package ROS 2 -->
+              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
+              <!-- Toujours utiliser les 3 MEMES valeurs pour ne pas déformer le cercle -->
+              <scale>0.002 0.002 0.002</scale>
             </mesh>
           </geometry>
-          <material>
-            <ambient>0.4 0.5 0.6 0.8</ambient>
-            <diffuse>0.2 0.3 0.4 0.8</diffuse>
-          </material>
         </visual>
         <collision name="net_collision">
-          <pose>0 0 0 1.5708 0 0</pose>
+          <pose>0 0 0 1.5708 0 0</pose> 
           <geometry>
             <mesh>
-                <uri>package://AUV_description/models/fish_net/meshes/plain.fbx</uri>
-                <scale>0.05 0.05 0.05</scale>
+              <uri>package://AUV_description/models/fish_net/meshes/fish_net.fbx</uri>
+              <scale>0.002 0.002 0.002</scale>
             </mesh>
           </geometry>
         </collision>
       </link>
     </model>
-
+    <!-- Test Cylinder (10m diameter for verification) -->
   </world>
 </sdf>
