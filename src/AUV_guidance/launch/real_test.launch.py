@@ -33,8 +33,8 @@ PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 
 # ── Spawn coordinates ────────────────────────────────────────────────────
 
-_SPAWN_RADIUS = 1.5    # [m]  circle radius
-_SPAWN_DEPTH  = -1   # [m]  depth
+_SPAWN_RADIUS = 3.4    # [m]  circle radius
+_SPAWN_DEPTH  = -2   # [m]  depth
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)
@@ -82,7 +82,7 @@ def generate_launch_description():
 
     use_hardware_arg = DeclareLaunchArgument(
         'use_hardware',
-        default_value='False',
+        default_value='True',
         description='Launch MAVROS and bluerov2_bridge instead of Gazebo sim',
     )
 
@@ -307,29 +307,30 @@ def generate_launch_description():
 
     try:
         mavros_pkg_path = get_package_share_directory('mavros')
+        mavros_node = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(mavros_pkg_path, 'launch', 'node.launch.py')
+            ),
+            launch_arguments={
+                'fcu_url': 'udp://192.168.2.1:14550@192.168.2.2:14555',
+                'gcs_url': 'udp://@localhost:14550',
+                'tgt_system': '1',
+                'tgt_component': '1',
+            }.items(),
+            condition=IfCondition(use_hardware),
+        )
+        
+        bluerov2_bridge_node = Node(
+            package='AUV_guidance',
+            executable='bluerov2_bridge',
+            name='bluerov2_bridge',
+            output='screen',
+            condition=IfCondition(use_hardware),
+        )
     except Exception:
-        mavros_pkg_path = ''
-
-    mavros_node = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(mavros_pkg_path, 'launch', 'node.launch.py')
-        ),
-        launch_arguments={
-            'fcu_url': 'udp://192.168.2.1:14550@192.168.2.2:14555',
-            'gcs_url': 'udp://@localhost:14550',
-            'tgt_system': '1',
-            'tgt_component': '1',
-        }.items(),
-        condition=IfCondition(use_hardware),
-    )
-
-    bluerov2_bridge_node = Node(
-        package='AUV_guidance',
-        executable='bluerov2_bridge',
-        name='bluerov2_bridge',
-        output='screen',
-        condition=IfCondition(use_hardware),
-    )
+        from launch.actions import LogInfo
+        mavros_node = LogInfo(msg="[WARNING] MAVROS package not found, skipping MAVROS launch.")
+        bluerov2_bridge_node = LogInfo(msg="[WARNING] MAVROS package not found, skipping bluerov2_bridge.")
 
     # ── RViz2 (optional) ──────────────────────────────────────────────────────
 
@@ -348,40 +349,40 @@ def generate_launch_description():
     control_rate = PythonExpression(["5.0 if '", optimize, "'.lower() in ('true', '1') else 20.0"])
     yaw_ema_alpha_val = PythonExpression(["1.0 if '", optimize, "'.lower() in ('true', '1') else 0.15"])
 
-    ping360_nearest_node = Node(
-        package='auv_perception',
-        executable='ping360_nearest',
-        name='ping360_nearest',
-        output='screen',
-        parameters=[{'use_sim_time': True}],
-    )
-
     net_approach_node = Node(
         package='AUV_guidance',
-        executable='net_approach',
+        executable='net_approach_real_test',
         name='net_approach',
         output='screen',
         parameters=[{
             'use_sim_time': True,
             'control_rate_hz': ParameterValue(control_rate, value_type=float),
+            'test_enable_z': False,
+            'test_enable_x': False,
+            'test_enable_yaw': False,
         }],
     )
 
     phase3_node = Node(
         package='AUV_guidance',
-        executable='phase3_inspection',
+        executable='inspection_real_test',
         name='phase3_inspection',
         output='screen',
         parameters=[{
             'use_sim_time': True,
             'control_rate_hz': ParameterValue(control_rate, value_type=float),
             'yaw_ema_alpha': ParameterValue(yaw_ema_alpha_val, value_type=float),
+            'test_enable_z': False,
+            'test_enable_x': False,
+            'test_enable_y': False,
+            'test_enable_yaw': False,
+            'test_enable_pitch': False,
         }],
     )
 
     delayed_mission = TimerAction(
         period=gz_delay,
-        actions=[ping360_nearest_node, net_approach_node, phase3_node],
+        actions=[net_approach_node, phase3_node],
     )
 
     # ── Assembly ──────────────────────────────────────────────────────────────

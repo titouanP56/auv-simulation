@@ -31,6 +31,10 @@ setup(
             'sonar_filter_node = auv_perception.sonar_filter_node:main',
             'auto_saver_node = auv_perception.auto_saver_node:main',
             'net_local_estimator = auv_perception.net_local_estimator:main',
+            'bt_to_ply = auv_perception.bt_to_ply:main',
+            'bag_to_ply = auv_perception.bag_to_ply:main',
+            'ping360_mapper_node = auv_perception.ping360_mapper_node:main',
+            'ping360_nearest = auv_perception.ping360_nearest:main',
         ],
     },
 )

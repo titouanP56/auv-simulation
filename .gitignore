@@ -27,3 +27,20 @@ test.sdf
 # OS
 .DS_Store
 Thumbs.db
+
+# ── Données lourdes (NE PAS commiter dans Git standard) ────────────────────────
+# ROS 2 bag files — utiliser git-lfs ou un stockage externe
+*.bag
+*.db3
+*.mcap
+
+# Nuages de points 3D (peuvent peser plusieurs centaines de Mo)
+*.ply
+*.pcd
+*.las
+*.laz
+
+# Modèles 3D générés / exports
+*.stl
+*.obj
+*.dae

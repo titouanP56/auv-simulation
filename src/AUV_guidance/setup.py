@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch', [
             'launch/net_full_inspection.launch.py',
             'launch/net_inspection_big_net.launch.py',
+            'launch/real_test.launch.py',
         ]),
     ],
     install_requires=['setuptools'],
@@ -35,6 +36,8 @@ setup(
             'phase3_inspection_current = AUV_guidance.phase3_inspection_current:main',
             'bluerov2_bridge = AUV_guidance.bluerov2_bridge:main',
             'sim_thruster_bridge = AUV_guidance.sim_thruster_bridge:main',
+            'net_approach_real_test = AUV_guidance.real_test.net_approach_real_test:main',
+            'inspection_real_test = AUV_guidance.real_test.inspection_real_test:main',
         ],
     },
 )

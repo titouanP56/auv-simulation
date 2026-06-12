@@ -379,6 +379,14 @@ def generate_launch_description():
     control_rate = PythonExpression(["5.0 if '", optimize, "'.lower() in ('true', '1') else 20.0"])
     yaw_ema_alpha_val = PythonExpression(["1.0 if '", optimize, "'.lower() in ('true', '1') else 0.15"])
 
+    ping360_nearest_node = Node(
+        package='auv_perception',
+        executable='ping360_nearest',
+        name='ping360_nearest',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
     net_approach_node = Node(
         package='AUV_guidance',
         executable='net_approach',
@@ -404,7 +412,7 @@ def generate_launch_description():
 
     delayed_mission = TimerAction(
         period=gz_delay,
-        actions=[net_approach_node, phase3_node],
+        actions=[ping360_nearest_node, net_approach_node, phase3_node],
     )
 
     # ── Assembly ──────────────────────────────────────────────────────────────
