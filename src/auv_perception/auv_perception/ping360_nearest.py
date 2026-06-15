@@ -2,63 +2,63 @@
 """
 ping360_nearest.py
 ==================
-Nœud ROS 2 de perception avancée pour le sonar mécanique Ping360.
+Advanced ROS 2 perception node for the Ping360 mechanical sonar.
 
-Pipeline de traitement (version 3 – sélection par ratio d'inliers RANSAC)
----------------------------------------------------------------------------
-  1. Réception des balayages (LaserScan) depuis /ping360/scan.
-  2. Pour chaque point valide du scan, transformation TF2 du repère
-     local du capteur (ping360_link) vers le repère fixe (odom) afin
-     de compenser les mouvements du robot pendant l'accumulation.
-  3. Accumulation dans un buffer à fenêtre temporelle correspondant à
-     UN tour complet du sonar (durée = angle_range / vitesse_angulaire).
-     L'AUV se maintient en place pendant ce tour (pas de mouvement avance).
-  4. À la fin d'un tour complet (nouvelle estimation "fraîche") :
-       a. DBSCAN  : clustering des points pour isoler les entités.
-       b. Sélection par ratio d'inliers RANSAC : pour chaque cluster,
-          on ajuste un polynôme deg-2 et on mesure le ratio d'inliers.
-          Un filet (même très courbé) colle à la courbe → ratio élevé.
-          Un banc de poissons volumétrique → ratio très faible.
-          On sélectionne le cluster au meilleur ratio ≥ ransac_min_inlier_ratio.
-       c. Point le plus proche : on cherche le point de la courbe RANSAC
-          le plus proche de l'AUV, on calcule la normale à la tangente.
-       d. Publication du résultat : yaw cible sous forme de Quaternion
-          dans un PoseStamped sur /perception/net_orientation.
-          → Flag "full_rotation_complete" dans un champ Bool séparé
-            pour signaler à net_approach.py qu'une estimation robuste
-            (tour complet) vient d'être produite.
+Processing pipeline (v3 – RANSAC inlier-ratio cluster selection)
+-----------------------------------------------------------------
+  1. Receive LaserScan sweeps from /ping360/scan.
+  2. For each valid range in the scan, use TF2 to transform the point from the
+     sensor frame (ping360_link) into the fixed world frame (odom), compensating
+     for robot motion during the accumulation window.
+  3. Accumulate transformed points in a rolling time window equal to ONE full
+     sonar rotation. The AUV holds position during this rotation (no forward
+     motion commanded).
+  4. At the end of a full rotation (fresh estimate trigger):
+       a. DBSCAN   : cluster the point cloud to isolate distinct objects.
+       b. RANSAC inlier-ratio selection : for each cluster, fit a degree-2
+          polynomial and measure the inlier ratio. A net (even heavily curved)
+          fits the curve well → high inlier ratio. A fish school (volumetric) →
+          very low inlier ratio. Select the cluster with the best ratio ≥
+          ransac_min_inlier_ratio.
+       c. Closest point : find the point on the RANSAC curve closest to the AUV
+          and compute the tangent normal.
+       d. Publish : target yaw as a Quaternion in a PoseStamped on
+          /perception/net_orientation.
+          → Publish a Bool on /perception/full_scan_ready to signal to
+            net_approach.py that a robust full-rotation estimate is ready.
 
-Paramètres ROS 2 déclarés (tous configurables via CLI / YAML)
---------------------------------------------------------------
-  sonar_topic             : topic LaserScan d'entrée   (défaut: /ping360/scan)
-  output_topic            : topic PoseStamped de sortie (défaut: /perception/net_orientation)
-  ready_topic             : topic Bool "tour complet"   (défaut: /perception/full_scan_ready)
-  source_frame            : repère du capteur           (défaut: ping360_link)
-  target_frame            : repère fixe de référence    (défaut: odom)
-  window_sec              : durée de la fenêtre (0 = auto depuis scan) (défaut: 0.0)
-  ignore_fraction         : fraction de range_max pour rejeter les échos saturés (défaut: 0.95)
-  min_range_m             : distance minimale valide en mètres (défaut: 0.3)
-  dbscan_eps              : rayon de voisinage DBSCAN en mètres  (défaut: 0.25)
-  dbscan_min_samples      : échantillons minimum pour un cluster  (défaut: 5)
-  ransac_min_inlier_ratio : ratio inliers/cluster minimum pour valider "filet" (défaut: 0.30)
-  ransac_residual         : seuil de résidu RANSAC en mètres      (défaut: 0.1)
-  ransac_min_samples      : nombre de points minimum pour RANSAC  (défaut: 10)
-  min_cluster_pts         : taille minimale du cluster candidat   (défaut: 15)
-  max_range_m             : distance maximale absolue acceptée [m] (défaut: 5.0)
-                            Permet d'isoler le filet des parois du bassin.
-                            Mettre à 0.0 pour désactiver (utilise ignore_fraction).
+ROS 2 Parameters (all configurable via CLI or YAML)
+----------------------------------------------------
+  sonar_topic             : input LaserScan topic      (default: /ping360/scan)
+  output_topic            : output PoseStamped topic   (default: /perception/net_orientation)
+  ready_topic             : full-scan Bool topic        (default: /perception/full_scan_ready)
+  source_frame            : sensor frame                (default: ping360_link)
+  target_frame            : fixed reference frame       (default: odom)
+  window_sec              : accumulation window in s (0 = auto from scan) (default: 0.0)
+  ignore_fraction         : fraction of range_max to reject saturated echoes (default: 0.95)
+  min_range_m             : minimum valid range in metres (default: 0.3)
+  dbscan_eps              : DBSCAN neighbourhood radius in metres (default: 0.25)
+  dbscan_min_samples      : minimum samples to form a DBSCAN cluster (default: 5)
+  ransac_min_inlier_ratio : minimum inlier/cluster ratio to validate as net (default: 0.30)
+  ransac_residual         : RANSAC residual threshold in metres (default: 0.1)
+  ransac_min_samples      : minimum points required for RANSAC fit (default: 10)
+  min_cluster_pts         : minimum cluster size to be a candidate (default: 15)
+  max_range_m             : absolute maximum valid range [m] (default: 5.0)
+                            Used to isolate the net from pool walls.
+                            Set to 0.0 to disable (uses ignore_fraction instead).
 
-Auteur  : titou
+Author  : titou
 Package : auv_perception
-Topics  : entrée → /ping360/scan  |  sortie → /perception/net_orientation
-                                             → /perception/full_scan_ready
+Topics  : input  → /ping360/scan
+          outputs → /perception/net_orientation
+                  → /perception/full_scan_ready
 """
 
-# ── Bibliothèques standard ────────────────────────────────────────────────────
+# ── Standard library ──────────────────────────────────────────────────────────
 import math
 from collections import deque
 
-# ── Calcul scientifique ───────────────────────────────────────────────────────
+# ── Scientific computing ──────────────────────────────────────────────────────
 import numpy as np
 from sklearn.cluster import DBSCAN
 
@@ -72,60 +72,59 @@ from geometry_msgs.msg import PoseStamped, PointStamped
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool
 import tf2_ros
-import tf2_geometry_msgs  # noqa: F401 — enregistre PointStamped dans tf2
+import tf2_geometry_msgs  # noqa: F401 — registers PointStamped with tf2
 
 
-# ── Constantes par défaut (surchargées par les paramètres ROS 2) ──────────────
+# ── Default constants (overridden by ROS 2 parameters) ───────────────────────
 
 _DEFAULT_SONAR_TOPIC       = "/ping360/scan"
 _DEFAULT_OUTPUT_TOPIC      = "/perception/net_orientation"
 _DEFAULT_READY_TOPIC       = "/perception/full_scan_ready"
 _DEFAULT_SOURCE_FRAME      = "ping360_link"
 _DEFAULT_TARGET_FRAME      = "odom"
-_DEFAULT_WINDOW_SEC        = 0.0    # 0 = durée automatique d'un tour complet
-_DEFAULT_IGNORE_FRAC       = 0.95   # ignore les échos à > 95 % de range_max
-_DEFAULT_MIN_RANGE_M       = 0.3    # zone morte proche du robot
-_DEFAULT_DBSCAN_EPS        = 0.25   # [m] rayon de voisinage DBSCAN
-_DEFAULT_DBSCAN_MIN_PTS    = 5      # points minimum pour constituer un cluster
-_DEFAULT_RANSAC_MIN_INLIER = 0.30   # ratio inliers/cluster minimum pour valider "filet"
-_DEFAULT_RANSAC_RESID      = 0.10   # [m] seuil de résidu RANSAC
-_DEFAULT_RANSAC_MIN_PTS    = 10     # points minimum pour l'ajustement polynomial
-_DEFAULT_MIN_CLUSTER       = 15     # taille minimale d'un cluster candidat
-_DEFAULT_MAX_RANGE_M       = 5.0    # [m] coupure absolue — isole filet (3-5m) des parois (>5m)
-                                    # mettre à 0.0 pour désactiver
+_DEFAULT_WINDOW_SEC        = 0.0    # 0 = auto-detect from full rotation duration
+_DEFAULT_IGNORE_FRAC       = 0.95   # discard echoes beyond 95% of range_max
+_DEFAULT_MIN_RANGE_M       = 0.3    # dead zone close to the robot
+_DEFAULT_DBSCAN_EPS        = 0.25   # [m] DBSCAN neighbourhood radius
+_DEFAULT_DBSCAN_MIN_PTS    = 5      # minimum points to form a cluster
+_DEFAULT_RANSAC_MIN_INLIER = 0.30   # minimum inlier ratio to validate as net
+_DEFAULT_RANSAC_RESID      = 0.10   # [m] RANSAC residual threshold
+_DEFAULT_RANSAC_MIN_PTS    = 10     # minimum points for polynomial fit
+_DEFAULT_MIN_CLUSTER       = 15     # minimum cluster size to be considered
+_DEFAULT_MAX_RANGE_M       = 5.0    # [m] hard cut-off — isolates net (3-5m) from walls (>5m)
+                                    # set to 0.0 to disable
 
 
 def _quaternion_from_yaw(yaw: float) -> tuple[float, float, float, float]:
     """
-    Convertit un angle yaw (rad) en quaternion (x, y, z, w).
-    Roll et Pitch sont supposés nuls (plan horizontal).
+    Convert a yaw angle (rad) to a quaternion (x, y, z, w).
+    Roll and pitch are assumed to be zero (horizontal plane).
     """
     half = yaw * 0.5
     return 0.0, 0.0, math.sin(half), math.cos(half)
 
 
-
 def _poly2_closest_point(coeffs: np.ndarray, pts: np.ndarray) -> tuple[float, float]:
     """
-    Trouve le point de la parabole y = a*x^2 + b*x + c le plus proche
-    du centroïde des points du cluster.
+    Find the point on the parabola y = a*x^2 + b*x + c closest to the
+    centroid of the cluster points.
 
-    La recherche est effectuée par échantillonnage dense sur la plage X du
-    cluster, ce qui est suffisamment précis pour des données sonar (~mm).
+    The search is done by dense sampling over the X range of the cluster,
+    which is accurate enough for sonar data (~mm resolution).
 
     Args:
-        coeffs : [a, b, c] du polynôme (degré 2, axe X principal).
-        pts    : nuage de points du cluster (N, 2).
+        coeffs : [a, b, c] polynomial coefficients (degree 2, X as independent axis).
+        pts    : cluster point cloud (N, 2).
 
     Returns:
-        (x_closest, y_closest) sur la courbe.
+        (x_closest, y_closest) on the fitted curve.
     """
     x_min, x_max = float(pts[:, 0].min()), float(pts[:, 0].max())
-    # 500 échantillons sur la plage couverte par le cluster
+    # 500 samples over the range spanned by the cluster
     x_samples = np.linspace(x_min, x_max, 500)
     y_samples = np.polyval(coeffs, x_samples)
 
-    centroid = pts.mean(axis=0)   # position de référence = centroïde du cluster
+    centroid = pts.mean(axis=0)   # reference point = cluster centroid
 
     dist2 = (x_samples - centroid[0]) ** 2 + (y_samples - centroid[1]) ** 2
     idx = int(np.argmin(dist2))
@@ -134,25 +133,25 @@ def _poly2_closest_point(coeffs: np.ndarray, pts: np.ndarray) -> tuple[float, fl
 
 def _poly2_normal_yaw(coeffs: np.ndarray, x0: float, toward_origin: np.ndarray) -> float:
     """
-    Calcule l'angle yaw du vecteur normal à la tangente de la parabole
-    au point (x0, y(x0)), orienté vers l'origine (= vers l'AUV).
+    Compute the yaw angle of the normal to the parabola tangent at point
+    (x0, y(x0)), oriented toward the origin (i.e., toward the AUV).
 
-    La tangente en x0 a pour pente dy/dx = 2*a*x0 + b.
-    La normale perpendiculaire est dans la direction (-dy/dx, 1) normalisée.
+    The tangent slope at x0 is dy/dx = 2*a*x0 + b.
+    The perpendicular normal is in direction (-dy/dx, 1), normalised.
 
     Args:
-        coeffs        : [a, b, c] du polynôme.
-        x0            : abscisse du point d'intérêt sur la courbe.
-        toward_origin : vecteur de référence indiquant la direction de l'AUV
-                        (typiquement [0,0] - centroïde, non normalisé).
+        coeffs        : [a, b, c] polynomial coefficients.
+        x0            : x-coordinate of the point of interest on the curve.
+        toward_origin : reference vector pointing toward the AUV
+                        (typically [0,0] - centroid, unnormalised).
 
     Returns:
-        yaw_rad : angle yaw (rad) du vecteur normal, orienté vers l'AUV.
+        yaw_rad : yaw angle (rad) of the normal, oriented toward the AUV.
     """
     a, b = float(coeffs[0]), float(coeffs[1])
-    slope_tangent = 2.0 * a * x0 + b          # dy/dx en x0
+    slope_tangent = 2.0 * a * x0 + b          # dy/dx at x0
 
-    # Normal perpendiculaire à la tangente (rotation 90°)
+    # Normal perpendicular to the tangent (90-degree rotation)
     normal = np.array([-slope_tangent, 1.0])
     norm_mag = np.linalg.norm(normal)
     if norm_mag < 1e-9:
@@ -160,7 +159,7 @@ def _poly2_normal_yaw(coeffs: np.ndarray, x0: float, toward_origin: np.ndarray) 
     else:
         normal /= norm_mag
 
-    # Orienter la normale vers l'AUV (en direction de toward_origin)
+    # Orient the normal toward the AUV
     if np.dot(normal, toward_origin) < 0:
         normal = -normal
 
@@ -168,27 +167,27 @@ def _poly2_normal_yaw(coeffs: np.ndarray, x0: float, toward_origin: np.ndarray) 
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Nœud principal
+# Main node
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Ping360NearestNode(Node):
     """
-    Nœud ROS 2 de perception avancée du filet de pêche par sonar Ping360.
+    ROS 2 perception node for aquaculture net detection using the Ping360 sonar.
 
-    Nouveautés v3 :
-    - Fenêtre temporelle = durée d'UN tour complet du sonar (auto-calculée).
-    - Sélection du cluster filet par ratio d'inliers RANSAC (robuste à la
-      courbure forte du filet due aux courants — la PCA globale échouait).
-    - RANSAC polynôme deg 2 pour modéliser la courbure du filet.
-    - Point le plus proche sur la courbe + normale → yaw cible.
-    - Publication d'un Bool sur /perception/full_scan_ready pour signaler
-      au nœud de guidage qu'une estimation "tour complet" est disponible.
+    v3 highlights:
+    - Accumulation window = duration of ONE full sonar rotation (auto-calibrated).
+    - Net cluster selected by RANSAC inlier ratio (robust against strong net
+      curvature from currents where global PCA fails).
+    - Degree-2 polynomial RANSAC to model net curvature.
+    - Closest point on the fitted curve + normal → target yaw.
+    - Publishes a Bool on /perception/full_scan_ready to signal to the
+      guidance node that a full-rotation estimate is available.
     """
 
     def __init__(self) -> None:
         super().__init__("ping360_nearest")
 
-        # ── Déclaration des paramètres ────────────────────────────────────────
+        # ── Parameter declarations ────────────────────────────────────────────
         self.declare_parameter("sonar_topic",          _DEFAULT_SONAR_TOPIC)
         self.declare_parameter("output_topic",         _DEFAULT_OUTPUT_TOPIC)
         self.declare_parameter("ready_topic",          _DEFAULT_READY_TOPIC)
@@ -205,7 +204,7 @@ class Ping360NearestNode(Node):
         self.declare_parameter("min_cluster_pts",         _DEFAULT_MIN_CLUSTER)
         self.declare_parameter("max_range_m",             _DEFAULT_MAX_RANGE_M)
 
-        # ── Lecture des paramètres ────────────────────────────────────────────
+        # ── Read parameters ───────────────────────────────────────────────────
         self._sonar_topic         = self.get_parameter("sonar_topic").value
         self._output_topic        = self.get_parameter("output_topic").value
         self._ready_topic         = self.get_parameter("ready_topic").value
@@ -222,47 +221,47 @@ class Ping360NearestNode(Node):
         self._min_cluster         = int(self.get_parameter("min_cluster_pts").value)
         self._max_range_m         = float(self.get_parameter("max_range_m").value)
 
-        # ── Buffer d'accumulation ─────────────────────────────────────────────
-        # Chaque entrée : (timestamp_sec: float, x: float, y: float)
+        # ── Point accumulation buffer ─────────────────────────────────────────
+        # Each entry: (timestamp_sec: float, x: float, y: float)
         self._point_buffer: deque[tuple[float, float, float]] = deque()
 
-        # ── Suivi du tour complet ─────────────────────────────────────────────
-        # Trois mécanismes de détection de fin de tour (du plus prioritaire au
-        # moins prioritaire) :
+        # ── Full-rotation tracking ────────────────────────────────────────────
+        # Three end-of-rotation detection mechanisms (priority order):
         #
-        #  A) Scan 360° en un seul message (Gazebo) :
-        #     Si angle_max - angle_min >= 300° le scan est déjà complet.
-        #     On publie le pipeline toutes les _min_period_sec secondes.
+        #  A) Single-message 360° scan (Gazebo):
+        #     If angle_max - angle_min >= 300°, the scan is already complete.
+        #     The pipeline is triggered every _min_period_sec seconds.
         #
-        #  B) Wrap-around angulaire (vrai Ping360 mécanique) :
-        #     Quand angle_min redescend de ~+π vers ~-π entre deux messages.
+        #  B) Angular wrap-around (real mechanical Ping360):
+        #     Triggered when angle_min jumps from ~+π back to ~-π between
+        #     two consecutive messages.
         #
-        #  C) Fallback temporel :
-        #     Si ni A ni B ne se déclenche et que le buffer est suffisant,
-        #     on publie quand même toutes les _min_period_sec secondes.
+        #  C) Temporal fallback:
+        #     If neither A nor B fires and the buffer is large enough, publish
+        #     every _min_period_sec seconds to avoid starvation.
         #
-        # _min_period_sec : intervalle minimal entre deux publications
-        #                   (évite de saturer le bus avec des estimations
-        #                   identiques si le sonar publie très vite).
+        # _min_period_sec : minimum interval between two pipeline triggers
+        #                   (prevents flooding the bus with repeated estimates
+        #                   when the sonar publishes very rapidly).
         self._last_angle_rad: float | None    = None
         self._tour_start_sec: float | None    = None
         self._tour_duration_sec: float | None = None
         self._full_tour_ready: bool           = False
-        self._last_pipeline_sec: float        = 0.0   # timestamp dernière publication
-        self._min_period_sec: float           = 2.0   # [s] anti-spam inter-estimations
+        self._last_pipeline_sec: float        = 0.0   # timestamp of last pipeline run
+        self._min_period_sec: float           = 2.0   # [s] anti-spam between estimates
 
         # ── TF2 ───────────────────────────────────────────────────────────────
         self._tf_buffer   = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
-        # ── QoS : Best Effort pour correspondre au bridge Gazebo ───────────────
+        # ── QoS: Best Effort to match the Gazebo bridge ───────────────────────
         sonar_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
 
-        # ── Abonnement sonar ───────────────────────────────────────────────────
+        # ── Sonar subscription ─────────────────────────────────────────────────
         self._sonar_sub = self.create_subscription(
             LaserScan,
             self._sonar_topic,
@@ -270,94 +269,94 @@ class Ping360NearestNode(Node):
             sonar_qos,
         )
 
-        # ── Publications ───────────────────────────────────────────────────────
+        # ── Publishers ─────────────────────────────────────────────────────────
         self._orient_pub = self.create_publisher(
             PoseStamped,
             self._output_topic,
             10,
         )
-        # Signal booléen : True = estimation fraîche d'un tour complet disponible
+        # Boolean signal: True = fresh full-rotation estimate is ready
         self._ready_pub = self.create_publisher(
             Bool,
             self._ready_topic,
             10,
         )
 
-        # ── Compteurs de diagnostic ────────────────────────────────────────────
+        # ── Diagnostic counters ────────────────────────────────────────────────
         self._n_scans_received = 0
         self._n_points_added   = 0
         self._n_tf_failures    = 0
         self._n_estimates_pub  = 0
 
         self.get_logger().info(
-            f"\n[ping360_nearest] Nœud démarré (v3 – Sélection RANSAC inlier-ratio)\n"
+            f"\n[ping360_nearest] Node started (v3 — RANSAC inlier-ratio selection)\n"
             f"  Sonar topic       : {self._sonar_topic}\n"
             f"  Output topic      : {self._output_topic}\n"
             f"  Ready topic       : {self._ready_topic}\n"
             f"  Frames            : {self._source_frame} → {self._target_frame}\n"
-            f"  Fenêtre           : {'auto (1 tour)' if self._window_sec == 0.0 else f'{self._window_sec} s'}\n"
-            f"  Filtre distance   : [{self._min_range_m:.2f} m — "
-            f"{'désactivé (ignore_fraction)' if self._max_range_m == 0.0 else f'{self._max_range_m:.2f} m'}]\n"
+            f"  Window            : {'auto (1 rotation)' if self._window_sec == 0.0 else f'{self._window_sec} s'}\n"
+            f"  Range filter      : [{self._min_range_m:.2f} m — "
+            f"{'disabled (ignore_fraction)' if self._max_range_m == 0.0 else f'{self._max_range_m:.2f} m'}]\n"
             f"  DBSCAN            : eps={self._dbscan_eps} m, min_pts={self._dbscan_min_pts}\n"
-            f"  RANSAC inlier ratio ≥ {self._ransac_min_inlier:.0%} (sélection filet)\n"
-            f"  RANSAC poly2      : résidu={self._ransac_resid} m, min_pts={self._ransac_min_pts}\n"
+            f"  RANSAC inlier ratio ≥ {self._ransac_min_inlier:.0%} (net selection threshold)\n"
+            f"  RANSAC poly2      : residual={self._ransac_resid} m, min_pts={self._ransac_min_pts}\n"
             f"  Min cluster       : {self._min_cluster} points"
         )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Callback principal
+    # Main scan callback
     # ──────────────────────────────────────────────────────────────────────────
 
     def _scan_callback(self, msg: LaserScan) -> None:
         """
-        Traite un scan LaserScan du Ping360.
+        Processes a LaserScan message from the Ping360.
 
-        Détection de fin de tour (par ordre de priorité) :
-          A) Le message couvre déjà ≥ 300° → scan complet en un seul message
-             (typique de Gazebo). On publie si _min_period_sec est écoulé.
-          B) Wrap-around angulaire entre deux messages consécutifs → vrai
-             Ping360 mécanique tournant par incréments.
-          C) Fallback temporel : on publie si _min_period_sec est écoulé et
-             le buffer est suffisant (garde-fou contre A et B non déclenchés).
+        End-of-rotation detection (priority order):
+          A) The message already covers ≥ 300° → complete scan in a single message
+             (typical of Gazebo). Publish if _min_period_sec has elapsed.
+          B) Angular wrap-around between consecutive messages → real mechanical
+             Ping360 rotating in increments.
+          C) Temporal fallback: publish if _min_period_sec has elapsed and the
+             buffer is large enough (guard against A and B not triggering).
         """
         self._n_scans_received += 1
 
         stamp_sec       = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         max_valid_range = msg.range_max * self._ignore_frac
 
-        # ── Debug : afficher les ranges reçues (toutes les 5 réceptions) ──────
+        # ── Debug: log range statistics every 5 scans ─────────────────────────
         if self._n_scans_received % 5 == 1:
             finite_ranges = [r for r in msg.ranges if math.isfinite(r)]
             if finite_ranges:
-                self.get_logger().info(
+                self.get_logger().debug(
                     f"[ping360_nearest] [DEBUG RANGES] scan #{self._n_scans_received}: "
                     f"n_rays={len(msg.ranges)}, finite={len(finite_ranges)}, "
                     f"min={min(finite_ranges):.3f} m, max={max(finite_ranges):.3f} m, "
-                    f"range_max={msg.range_max:.1f} m, seuil_valid={max_valid_range:.3f} m"
+                    f"range_max={msg.range_max:.1f} m, valid_threshold={max_valid_range:.3f} m"
                 )
             else:
-                self.get_logger().warn(
+                self.get_logger().debug(
                     f"[ping360_nearest] [DEBUG RANGES] scan #{self._n_scans_received}: "
-                    f"AUCUNE range finie parmi {len(msg.ranges)} rayons ! "
-                    f"(tout est inf/NaN)"
+                    f"NO finite ranges among {len(msg.ranges)} rays! "
+                    f"(all inf/NaN)"
                 )
 
-        # ── A) Scan déjà 360° en un seul message (Gazebo / simulation) ────────
+        # ── A) Full 360° scan in a single message (Gazebo / simulation) ───────
         scan_angular_range = abs(msg.angle_max - msg.angle_min)
         is_full_scan_msg   = scan_angular_range >= math.radians(300.0)
 
-        # ── B) Wrap-around angulaire (vrai Ping360 mécanique) ─────────────────
+        # ── B) Angular wrap-around (real mechanical Ping360) ──────────────────
         wrap_detected = False
         current_angle = msg.angle_min
         if self._last_angle_rad is not None and not is_full_scan_msg:
             angle_delta = current_angle - self._last_angle_rad
-            if angle_delta < -math.pi:      # saut de ~+π → ~-π = nouveau tour
+            if angle_delta < -math.pi:      # jump from ~+π to ~-π = new rotation
                 wrap_detected = True
                 if self._tour_start_sec is not None:
                     self._tour_duration_sec = stamp_sec - self._tour_start_sec
-                    self.get_logger().info(
-                        f"[ping360_nearest] Tour complet (wrap-around) — "
-                        f"durée: {self._tour_duration_sec:.2f} s"
+                    self.get_logger().debug(
+                        f"[ping360_nearest] Full rotation (wrap-around) — "
+                        f"duration: {self._tour_duration_sec:.2f} s"
                     )
                 self._tour_start_sec = stamp_sec
                 self._full_tour_ready = True
@@ -366,7 +365,7 @@ class Ping360NearestNode(Node):
                 self._tour_start_sec = stamp_sec
         self._last_angle_rad = current_angle
 
-        # ── Transformation TF2 globale (une seule fois par message) ───────────
+        # ── TF2 transform: looked up once per message for efficiency ──────────
         frame_id = msg.header.frame_id if msg.header.frame_id else self._source_frame
         try:
             transform = self._tf_buffer.lookup_transform(
@@ -383,15 +382,14 @@ class Ping360NearestNode(Node):
             self._n_tf_failures += 1
             if self._n_tf_failures % 5 == 1:
                 self.get_logger().warn(
-                    f"[ping360_nearest] TF2 Exception #{self._n_tf_failures} "
-                    f"({type(exc).__name__}) : {exc}  "
+                    f"[ping360_nearest] TF2 failure #{self._n_tf_failures} "
+                    f"({type(exc).__name__}): {exc}  "
                     f"[frames: {frame_id} → {self._target_frame}]"
                 )
             return
 
-        # ── Traitement de chaque rayon ─────────────────────────────────────────
-        # Seuil de distance supérieure : max_range_m (absolu) si actif, sinon
-        # ignore_fraction * range_max comme avant.
+        # ── Process each range ray ─────────────────────────────────────────────
+        # Upper distance threshold: use max_range_m if set, otherwise ignore_fraction * range_max.
         if self._max_range_m > 0.0:
             effective_max = self._max_range_m
         else:
@@ -418,28 +416,28 @@ class Ping360NearestNode(Node):
             self._n_points_added   += 1
             n_pts_added_this_scan  += 1
 
-        # Log pour calibrer max_range_m : combien de points ont passé le filtre ?
+        # Log filter efficiency to help tune max_range_m
         if self._n_scans_received % 5 == 1:
-            self.get_logger().info(
-                f"[ping360_nearest] [FILTRE] scan #{self._n_scans_received}: "
-                f"{n_pts_added_this_scan}/{len(msg.ranges)} rayons acceptés "
-                f"(seuil: {self._min_range_m:.2f}—{effective_max:.2f} m), "
+            self.get_logger().debug(
+                f"[ping360_nearest] [FILTER] scan #{self._n_scans_received}: "
+                f"{n_pts_added_this_scan}/{len(msg.ranges)} rays accepted "
+                f"(threshold: {self._min_range_m:.2f}—{effective_max:.2f} m), "
                 f"buffer={len(self._point_buffer)} pts"
             )
 
-        # ── Purge de la fenêtre glissante ─────────────────────────────────────
+        # ── Rolling window pruning ─────────────────────────────────────────────
         if self._window_sec > 0.0:
             window = self._window_sec
         elif self._tour_duration_sec is not None:
             window = self._tour_duration_sec
         else:
-            window = 10.0   # valeur conservatrice en attendant la calibration
+            window = 10.0   # conservative fallback until duration is calibrated
 
         cutoff = stamp_sec - window
         while self._point_buffer and self._point_buffer[0][0] < cutoff:
             self._point_buffer.popleft()
 
-        # ── Décision de déclenchement du pipeline ─────────────────────────────
+        # ── Pipeline trigger decision ──────────────────────────────────────────
         time_since_last = stamp_sec - self._last_pipeline_sec
         throttled_ok    = time_since_last >= self._min_period_sec
         buffer_ok       = len(self._point_buffer) >= self._min_cluster
@@ -448,92 +446,104 @@ class Ping360NearestNode(Node):
         trigger_reason = ""
 
         if is_full_scan_msg and throttled_ok and buffer_ok:
-            # Cas A : scan Gazebo déjà complet
+            # Case A: Gazebo full-scan message
             trigger = True
-            trigger_reason = f"scan_360° ({math.degrees(scan_angular_range):.0f}°)"
+            trigger_reason = f"full_scan_360° ({math.degrees(scan_angular_range):.0f}°)"
         elif wrap_detected and buffer_ok:
-            # Cas B : vrai Ping360 mécanique
+            # Case B: real mechanical Ping360
             trigger = True
-            trigger_reason = "wrap-around détecté"
+            trigger_reason = "wrap-around detected"
         elif throttled_ok and buffer_ok and self._n_scans_received > 5:
-            # Cas C : fallback temporel (ni A ni B déclenchés)
+            # Case C: temporal fallback (neither A nor B triggered)
             trigger = True
-            trigger_reason = f"fallback temporel ({time_since_last:.1f} s écoulés)"
+            trigger_reason = f"temporal fallback ({time_since_last:.1f} s elapsed)"
 
         if trigger:
-            self.get_logger().info(
-                f"[ping360_nearest] ▶ Pipeline déclenché — raison: {trigger_reason}  "
+            self.get_logger().debug(
+                f"[ping360_nearest] ▶ Pipeline triggered — reason: {trigger_reason}  "
                 f"buffer={len(self._point_buffer)} pts"
             )
             self._last_pipeline_sec = stamp_sec
             self._detect_and_publish(stamp_sec, msg.header.stamp)
         elif is_full_scan_msg and buffer_ok and not throttled_ok:
-            pass   # scan valide mais trop fréquent → silence (pas de log inutile)
+            pass   # valid scan but too frequent → silent (no spam log)
         elif not buffer_ok and time_since_last >= self._min_period_sec:
             self.get_logger().warn(
-                f"[ping360_nearest] Buffer insuffisant depuis {time_since_last:.1f} s — "
-                f"{len(self._point_buffer)}/{self._min_cluster} pts requis. "
-                f"scans_reçus={self._n_scans_received}, pts_ajoutés_total={self._n_points_added}, "
+                f"[ping360_nearest] Buffer too small for {time_since_last:.1f} s — "
+                f"{len(self._point_buffer)}/{self._min_cluster} pts required. "
+                f"scans_received={self._n_scans_received}, pts_added_total={self._n_points_added}, "
                 f"tf_failures={self._n_tf_failures}. "
-                "Vérifiez la portée du sonar, l'arbre TF et les paramètres de filtrage."
+                "Check sonar range, TF tree, and filtering parameters."
             )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Pipeline de détection : DBSCAN → sélection RANSAC → publication
+    # Detection pipeline: DBSCAN → RANSAC selection → publish
     # ──────────────────────────────────────────────────────────────────────────
 
     def _detect_and_publish(self, stamp_sec: float, ros_stamp) -> None:
         """
-        Exécute le pipeline de détection sur le buffer courant et publie
-        le résultat.
+        Runs the detection pipeline on the current buffer and publishes the result.
 
-        Étapes internes :
-          1. Conversion du buffer en matrice NumPy (N, 2).
-          2. DBSCAN → clusters candidats.
-          3. Sélection par ratio d'inliers RANSAC : le cluster dont le plus
-             grand ratio de points colle à une parabole deg-2 est identifié
-             comme le filet. Retourne directement les coeffs + inliers.
-          4. Point de la courbe le plus proche de l'AUV → normale → yaw cible.
-          5. Construction et publication du PoseStamped + Bool "ready".
+        Internal steps:
+          1. Convert buffer to a NumPy (N, 2) matrix.
+          2. DBSCAN → candidate clusters.
+          3. RANSAC inlier-ratio selection: the cluster whose points best fit a
+             degree-2 parabola is identified as the net. Returns coefficients and
+             inlier points directly.
+          4. Closest point on the fitted curve to the AUV → normal → target yaw.
+          5. Build and publish PoseStamped + Bool "ready" signal.
         """
-        # ── 1. Extraction de la matrice XY ────────────────────────────────────
+        # ── 1. Extract XY matrix ───────────────────────────────────────────────
         pts = np.array([(x, y) for _, x, y in self._point_buffer], dtype=np.float64)
 
-        # ── 2. Clustering DBSCAN ──────────────────────────────────────────────
+        # ── 2. DBSCAN clustering ───────────────────────────────────────────────
         labels = self._run_dbscan(pts)
         if labels is None:
             return
 
-        # ── 3. Sélection du cluster filet + RANSAC poly2 ──────────────────────
-        # _select_net_cluster_ransac itère sur les clusters, lance RANSAC sur
-        # chacun et retourne le meilleur (ratio inliers le plus élevé).
+        # ── 3. Net cluster selection + RANSAC poly2 ────────────────────────────
+        # _select_net_cluster_ransac iterates over clusters, runs RANSAC on each,
+        # and returns the best one (highest inlier ratio).
         selection = self._select_net_cluster_ransac(pts, labels)
         if selection is None:
-            return   # logs d'erreur déjà émis dans la méthode
+            return   # error logs already emitted inside the method
 
-        net_pts, coeffs, inlier_pts = selection
-        # coeffs = [a, b, c] dans l'espace de régression (éventuellement permuté)
-        # inlier_pts est dans le même espace (pour _poly2_closest_point)
+        net_pts, coeffs, inlier_pts, swap_axes = selection
+        # coeffs = [a, b, c] in regression space (possibly axis-swapped)
+        # inlier_pts is in the same space (for _poly2_closest_point)
 
-        # ── 4. Point le plus proche + normale ─────────────────────────────────
-        # En pratique, on cherche le point de la courbe le plus proche du
-        # centroïde du cluster (meilleure approximation de "proche de l'AUV"
-        # dans le repère odom courant).
-        x_close, y_close = _poly2_closest_point(coeffs, inlier_pts)
+        # ── 4. Closest point + normal ──────────────────────────────────────────
+        # Find the point on the fitted curve closest to the cluster centroid
+        # (best approximation of "closest to AUV" in the current odom frame).
+        x_close_fit, y_close_fit = _poly2_closest_point(coeffs, inlier_pts)
 
-        # Vecteur de l'AUV (approximation : origine du repère odom = [0,0])
-        # vers le cluster, pour orienter la normale vers l'AUV.
+        # Vector from AUV (approx at odom origin = [0,0]) toward the cluster,
+        # used to orient the normal toward the AUV.
         net_centroid = inlier_pts.mean(axis=0)
-        toward_auv   = np.array([0.0, 0.0]) - net_centroid   # AUV ≈ at odom origin
+        toward_net   = net_centroid - np.array([0.0, 0.0])   # AUV ≈ at odom origin
 
-        yaw_target = _poly2_normal_yaw(coeffs, x_close, toward_auv)
+        yaw_fit = _poly2_normal_yaw(coeffs, x_close_fit, toward_net)
 
-        # ── 5. Construction et publication du PoseStamped ─────────────────────
+        if swap_axes:
+            # Axes were swapped during regression; restore original frame.
+            x_close = y_close_fit
+            y_close = x_close_fit
+
+            # The normal vector (cos, sin) in swapped space (Y, X) must be
+            # mapped back to (X, Y) via axis swap.
+            vec_fit = np.array([math.cos(yaw_fit), math.sin(yaw_fit)])
+            yaw_target = math.atan2(vec_fit[0], vec_fit[1])  # atan2(X_fit, Y_fit)
+        else:
+            x_close = x_close_fit
+            y_close = y_close_fit
+            yaw_target = yaw_fit
+
+        # ── 5. Build and publish PoseStamped ──────────────────────────────────
         pose_msg = PoseStamped()
         pose_msg.header.stamp    = ros_stamp
         pose_msg.header.frame_id = self._target_frame
 
-        # Position = point le plus proche de l'AUV sur la courbe fittée
+        # Position = closest point on the fitted curve to the AUV
         pose_msg.pose.position.x = x_close
         pose_msg.pose.position.y = y_close
         pose_msg.pose.position.z = 0.0
@@ -547,15 +557,15 @@ class Ping360NearestNode(Node):
         self._orient_pub.publish(pose_msg)
         self._n_estimates_pub += 1
 
-        # Signale qu'une estimation fraîche (tour complet) est disponible
+        # Signal that a fresh full-rotation estimate is available
         ready_msg = Bool()
         ready_msg.data = True
         self._ready_pub.publish(ready_msg)
 
-        self.get_logger().info(
-            f"[ping360_nearest] ✔ Estimation #{self._n_estimates_pub} (tour complet) : "
+        self.get_logger().debug(
+            f"[ping360_nearest] ✔ Estimate #{self._n_estimates_pub} (full rotation): "
             f"yaw={math.degrees(yaw_target):.1f}°  "
-            f"pt_proche=({x_close:.2f}, {y_close:.2f})  "
+            f"closest_pt=({x_close:.2f}, {y_close:.2f})  "
             f"cluster={len(net_pts)} pts → inliers={len(inlier_pts)} "
             f"({len(inlier_pts)/len(net_pts):.0%})  "
             f"buffer={len(pts)} pts"
@@ -567,25 +577,25 @@ class Ping360NearestNode(Node):
 
     def _run_dbscan(self, pts: np.ndarray) -> np.ndarray | None:
         """
-        Lance DBSCAN sur la matrice de points (N, 2).
+        Run DBSCAN on the (N, 2) point matrix.
 
-        Retourne le tableau de labels (−1 = bruit/poisson) ou None en cas d'erreur.
+        Returns the label array (−1 = noise / fish) or None on failure.
         """
         try:
             db = DBSCAN(
                 eps=self._dbscan_eps,
                 min_samples=self._dbscan_min_pts,
                 metric="euclidean",
-                n_jobs=1,  # déterministe, pas de parallélisme
+                n_jobs=1,  # deterministic, no parallelism
             )
             labels = db.fit_predict(pts)
             return labels
         except Exception as exc:
-            self.get_logger().warn(f"[ping360_nearest] DBSCAN échoué : {exc}")
+            self.get_logger().warn(f"[ping360_nearest] DBSCAN failed: {exc}")
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Sélection du cluster filet par ratio d'inliers RANSAC
+    # Net cluster selection via RANSAC inlier ratio
     # ──────────────────────────────────────────────────────────────────────────
 
     def _select_net_cluster_ransac(
@@ -594,38 +604,38 @@ class Ping360NearestNode(Node):
         labels: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
         """
-        Sélectionne le cluster le plus susceptible d'être le filet en testant
-        le ratio d'inliers d'un ajustement RANSAC polynôme deg-2 sur chaque
-        cluster candidat.
+        Select the cluster most likely to be the aquaculture net by testing the
+        RANSAC inlier ratio of a degree-2 polynomial fit on each candidate cluster.
 
-        Raisonnement :
-        - Un filet de pêche, même très courbé par les courants, est une
-          structure surfacique quasi-2D → les points collent bien à une
-          parabole → ratio d'inliers élevé (≥ ransac_min_inlier_ratio).
-        - Un banc de poissons est volumétrique → les points sont épars dans
-          le repère 2D du sonar → ratio d'inliers très faible.
+        Rationale:
+        - An aquaculture net, even heavily curved by currents, is a quasi-2D
+          surface structure → points fit well onto a parabola → high inlier ratio
+          (≥ ransac_min_inlier_ratio).
+        - A fish school is volumetric → points are scattered in 2D sonar space →
+          very low inlier ratio.
 
-        Cette heuristique est robuste là où la PCA échoue : un filet en
-        « ventre » profond a une variance isotrope (ratio PCA ≈ 1) mais
-        toujours un fort ratio d'inliers RANSAC.
+        This heuristic is robust where global PCA fails: a deeply bowed net has
+        near-isotropic variance (PCA ratio ≈ 1) but still yields a high RANSAC
+        inlier ratio.
 
         Args:
-            pts    : matrice (N, 2) de tous les points du buffer (repère odom).
-            labels : tableau de labels DBSCAN (−1 = bruit).
+            pts    : (N, 2) matrix of all buffer points in the odom frame.
+            labels : DBSCAN label array (−1 = noise).
 
         Returns:
-            (cluster_pts, coeffs, inlier_pts_for_helpers) ou None.
-            - cluster_pts            : points bruts du cluster sélectionné (M, 2)
-            - coeffs                 : [a, b, c] du polynôme RANSAC retenu
-            - inlier_pts_for_helpers : points inliers dans l'espace de régression
-                                       (pour _poly2_closest_point et _poly2_normal_yaw)
+            (cluster_pts, coeffs, inlier_pts_for_helpers, swap_axes) or None.
+            - cluster_pts            : raw points of the selected cluster (M, 2)
+            - coeffs                 : [a, b, c] RANSAC polynomial coefficients
+            - inlier_pts_for_helpers : inlier points in regression space
+                                       (for _poly2_closest_point and _poly2_normal_yaw)
+            - swap_axes              : True if X/Y axes were swapped during regression
         """
         unique_labels = set(labels)
-        unique_labels.discard(-1)   # ignorer le bruit DBSCAN
+        unique_labels.discard(-1)   # ignore DBSCAN noise
 
         if not unique_labels:
             self.get_logger().warn(
-                f"[ping360_nearest] ✗ DBSCAN : 0 cluster trouvé (tout = bruit). "
+                f"[ping360_nearest] ✗ DBSCAN: 0 clusters found (all noise). "
                 f"n_points={len(pts)}, eps={self._dbscan_eps}, "
                 f"min_samples={self._dbscan_min_pts}"
             )
@@ -633,9 +643,9 @@ class Ping360NearestNode(Node):
 
         best_label        = None
         best_inlier_ratio = -1.0
-        best_result       = None   # (coeffs, inlier_pts_for_helpers)
+        best_result       = None   # (coeffs, inlier_pts_for_helpers, swap_axes)
         best_cluster_pts  = None
-        cluster_info      = []     # pour le log de diagnostic
+        cluster_info      = []     # for diagnostic log
         too_small_count   = 0
 
         for lbl in unique_labels:
@@ -646,59 +656,59 @@ class Ping360NearestNode(Node):
                 too_small_count += 1
                 continue
 
-            # Lance RANSAC poly-2 sur ce cluster
+            # Run degree-2 polynomial RANSAC on this cluster
             result = self._run_ransac_poly2(cluster_pts)
             if result is None:
-                # RANSAC n'a pas convergé → cluster rejeté (log déjà émis)
+                # RANSAC did not converge → cluster rejected (log emitted inside)
                 cluster_info.append((lbl, n, 0.0))
                 continue
 
-            coeffs, inlier_pts_helpers = result
+            coeffs, inlier_pts_helpers, swap_axes = result
             inlier_ratio = len(inlier_pts_helpers) / n
             cluster_info.append((lbl, n, inlier_ratio))
 
             if inlier_ratio > best_inlier_ratio:
                 best_inlier_ratio = inlier_ratio
                 best_label        = lbl
-                best_result       = (coeffs, inlier_pts_helpers)
+                best_result       = (coeffs, inlier_pts_helpers, swap_axes)
                 best_cluster_pts  = cluster_pts
 
-        # ── Log de diagnostic (toujours visible au level par défaut) ───────────
+        # ── Diagnostic log ─────────────────────────────────────────────────────
         if cluster_info:
             info_str = "  ".join(
                 f"[lbl={l}, n={n}, inliers={r:.0%}]" for l, n, r in cluster_info
             )
-            self.get_logger().warn(
-                f"[ping360_nearest] Clusters RANSAC : {info_str}  "
-                f"→ Meilleur label={best_label} "
-                f"(ratio={best_inlier_ratio:.0%}, seuil={self._ransac_min_inlier:.0%})"
+            self.get_logger().debug(
+                f"[ping360_nearest] RANSAC clusters: {info_str}  "
+                f"→ Best label={best_label} "
+                f"(ratio={best_inlier_ratio:.0%}, threshold={self._ransac_min_inlier:.0%})"
             )
         else:
-            # Tous les clusters sont sous min_cluster_pts
+            # All clusters were below min_cluster_pts
             n_labels  = len(unique_labels)
             noise_pts = int(np.sum(labels == -1))
-            self.get_logger().warn(
-                f"[ping360_nearest] ✗ DBSCAN a trouvé {n_labels} cluster(s) mais TOUS "
-                f"ont < {self._min_cluster} pts (min_cluster_pts). "
-                f"Bruit DBSCAN: {noise_pts}/{len(pts)} pts."
+            self.get_logger().debug(
+                f"[ping360_nearest] ✗ DBSCAN found {n_labels} cluster(s) but ALL "
+                f"have < {self._min_cluster} pts (min_cluster_pts). "
+                f"DBSCAN noise: {noise_pts}/{len(pts)} pts."
             )
             return None
 
-        # ── Validation du meilleur candidat ───────────────────────────────────
+        # ── Validate the best candidate ────────────────────────────────────────
         if best_result is None or best_inlier_ratio < self._ransac_min_inlier:
             self.get_logger().warn(
-                f"[ping360_nearest] ✗ RANSAC : aucun cluster ne dépasse le seuil "
-                f"d'inliers ({self._ransac_min_inlier:.0%}). "
-                f"Meilleur ratio obtenu : {best_inlier_ratio:.0%}. "
-                "Peut-être uniquement des bancs de poissons volumétriques ?"
+                f"[ping360_nearest] ✗ RANSAC: no cluster exceeds the inlier "
+                f"threshold ({self._ransac_min_inlier:.0%}). "
+                f"Best ratio achieved: {best_inlier_ratio:.0%}. "
+                "Possibly only volumetric fish schools in view."
             )
             return None
 
-        coeffs, inlier_pts_helpers = best_result
-        return best_cluster_pts, coeffs, inlier_pts_helpers
+        coeffs, inlier_pts_helpers, swap_axes = best_result
+        return best_cluster_pts, coeffs, inlier_pts_helpers, swap_axes
 
     # ──────────────────────────────────────────────────────────────────────────
-    # RANSAC Polynôme de degré 2 (courbe du filet)
+    # Degree-2 polynomial RANSAC (net curve fitting)
     # ──────────────────────────────────────────────────────────────────────────
 
     def _run_ransac_poly2(
@@ -706,43 +716,43 @@ class Ping360NearestNode(Node):
         pts: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray] | None:
         """
-        Ajuste un polynôme de degré 2 (parabole) sur les points du cluster via
-        RANSAC manuel pour être robuste aux outliers résiduels après DBSCAN.
+        Fit a degree-2 polynomial (parabola) to cluster points using manual RANSAC
+        to be robust against residual outliers remaining after DBSCAN.
 
-        Stratégie :
-        - On détermine l'axe principal du cluster via PCA pour choisir si on
-          fait la régression y=f(x) ou x=f(y), évitant ainsi la dégénérescence
-          sur les filets quasi-verticaux.
-        - RANSAC : tirage aléatoire de 3 points, ajustement d'un poly deg-2,
-          comptage des inliers (résidu < _ransac_resid).
-        - On retourne les coefficients du meilleur modèle et les points inliers.
+        Strategy:
+        - Choose the regression axis via variance (PCA-lite): the axis with higher
+          variance becomes the independent X axis, avoiding degeneracy for near-
+          vertical nets.
+        - RANSAC: randomly sample 3 points (minimum for a quadratic), fit a degree-2
+          polynomial, count inliers (residual < _ransac_resid).
+        - Return the best model coefficients and the corresponding inlier points.
 
         Returns:
-            (coeffs, inlier_pts) où coeffs = [a, b, c] (poly deg-2 dans
-            l'espace éventuellement permuté), ou None en cas d'échec.
+            (coeffs, inlier_pts, swap_axes) where coeffs = [a, b, c] (degree-2
+            polynomial in the possibly-swapped regression space), or None on failure.
         """
         if len(pts) < self._ransac_min_pts:
             self.get_logger().debug(
-                f"[ping360_nearest] RANSAC poly2 ignoré : {len(pts)} pts "
+                f"[ping360_nearest] RANSAC poly2 skipped: {len(pts)} pts "
                 f"< min={self._ransac_min_pts}."
             )
             return None
 
-        # ── Choix de l'axe de régression via PCA ─────────────────────────────
-        # On calcule la variance de chaque axe. L'axe avec le plus de variance
-        # devient l'axe indépendant X pour la régression.
+        # ── Choose regression axis via variance ───────────────────────────────
+        # The axis with the highest variance becomes the independent X axis.
+        # This prevents degeneracy when the net runs roughly vertical on screen.
         var_x = float(np.var(pts[:, 0]))
         var_y = float(np.var(pts[:, 1]))
-        swap_axes = var_y > var_x   # si le filet est quasi-vertical, on permute
+        swap_axes = var_y > var_x   # swap if the net is near-vertical
 
         if swap_axes:
-            X_fit = pts[:, 1].copy()  # y devient l'axe indépendant
-            Y_fit = pts[:, 0].copy()  # x devient la variable dépendante
+            X_fit = pts[:, 1].copy()  # y becomes the independent axis
+            Y_fit = pts[:, 0].copy()  # x becomes the dependent variable
         else:
             X_fit = pts[:, 0].copy()
             Y_fit = pts[:, 1].copy()
 
-        # ── RANSAC manuel sur polynôme deg 2 ──────────────────────────────────
+        # ── Manual RANSAC on degree-2 polynomial ───────────────────────────────
         n_pts = len(pts)
         n_trials = 300
         best_inlier_mask = None
@@ -752,7 +762,7 @@ class Ping360NearestNode(Node):
         rng = np.random.default_rng(seed=42)
 
         for _ in range(n_trials):
-            # Tirage de 3 points (minimum pour un poly deg-2)
+            # Sample 3 points (minimum for a quadratic fit)
             idx = rng.choice(n_pts, size=3, replace=False)
             X_s, Y_s = X_fit[idx], Y_fit[idx]
 
@@ -761,7 +771,7 @@ class Ping360NearestNode(Node):
             except (np.linalg.LinAlgError, ValueError):
                 continue
 
-            # Calcul des résidus sur tous les points
+            # Compute residuals over all cluster points
             Y_pred   = np.polyval(coeffs, X_fit)
             residuals = np.abs(Y_fit - Y_pred)
             inlier_mask = residuals < self._ransac_resid
@@ -774,64 +784,59 @@ class Ping360NearestNode(Node):
 
         if best_coeffs is None or best_n_inliers < self._ransac_min_pts:
             self.get_logger().warn(
-                f"[ping360_nearest] RANSAC poly2 n'a pas convergé "
-                f"(meilleur inliers={best_n_inliers}, requis={self._ransac_min_pts})."
+                f"[ping360_nearest] RANSAC poly2 did not converge "
+                f"(best inliers={best_n_inliers}, required={self._ransac_min_pts})."
             )
             return None
 
-        # ── Ré-ajustement sur tous les inliers (solution finale plus stable) ──
+        # ── Re-fit on all inliers for a more stable final model ───────────────
         X_in = X_fit[best_inlier_mask]
         Y_in = Y_fit[best_inlier_mask]
         try:
             final_coeffs = np.polyfit(X_in, Y_in, deg=2)
         except (np.linalg.LinAlgError, ValueError) as exc:
             self.get_logger().warn(
-                f"[ping360_nearest] RANSAC poly2 re-fit échoué : {exc}"
+                f"[ping360_nearest] RANSAC poly2 re-fit failed: {exc}"
             )
             return None
 
-        # Reconstruire les points inliers dans le repère ORIGINAL (non-permuté)
+        # Rebuild inlier points in the original (non-swapped) frame
         if swap_axes:
             # X_fit = pts[:,1], Y_fit = pts[:,0]
-            inlier_pts = pts[best_inlier_mask]   # points originaux filtrés
+            inlier_pts = pts[best_inlier_mask]   # original points, filtered
         else:
             inlier_pts = pts[best_inlier_mask]
 
         self.get_logger().debug(
-            f"[ping360_nearest] RANSAC poly2 : "
+            f"[ping360_nearest] RANSAC poly2: "
             f"inliers={best_n_inliers}/{n_pts}  "
             f"a={final_coeffs[0]:.4f}  b={final_coeffs[1]:.4f}  "
             f"swap_axes={swap_axes}"
         )
 
-        # On stocke l'info de permutation dans les coefficients en retournant
-        # un tuple avec les coefficients dans l'espace permuté + le flag.
-        # La fonction appelante (_detect_and_publish) utilise les helpers
-        # _poly2_closest_point / _poly2_normal_yaw qui opèrent dans cet espace.
-        # Pour rester cohérent : si swap_axes, on retourne les coefficients tels
-        # quels mais les points inliers sont dans l'espace permuté.
+        # Return coefficients in regression space + swap flag.
+        # The callers (_poly2_closest_point / _poly2_normal_yaw) operate in this
+        # space and expect [X_indep, Y_dep] ordering for the inlier points.
         if swap_axes:
-            # Retourner les points inliers dans l'espace permuté pour les
-            # helpers (ils s'attendent à [X_indep, Y_dep])
             inlier_pts_for_helpers = np.column_stack([X_in, Y_in])
         else:
             inlier_pts_for_helpers = inlier_pts
 
-        return final_coeffs, inlier_pts_for_helpers
+        return final_coeffs, inlier_pts_for_helpers, swap_axes
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Point d'entrée
+# Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main(args=None) -> None:
-    """Point d'entrée standard ROS 2."""
+    """Standard ROS 2 entry point."""
     rclpy.init(args=args)
     node = Ping360NearestNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("[ping360_nearest] Interruption clavier — arrêt propre.")
+        node.get_logger().info("[ping360_nearest] Keyboard interrupt — shutting down.")
     finally:
         try:
             node.destroy_node()

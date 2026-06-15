@@ -356,6 +356,22 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
     )
 
+    sonoptix_perception_node = Node(
+        package='auv_perception',
+        executable='sonoptix_perception',
+        name='sonoptix_perception',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'min_range_m':              0.3,
+            'max_range_m':              7.0,
+            'ransac_distance_threshold': 0.2,
+            'ransac_n':                 3,
+            'min_inlier_ratio':         0.25,
+            'min_points':               10,
+        }],
+    )
+
     net_approach_node = Node(
         package='AUV_guidance',
         executable='net_approach',
@@ -381,7 +397,12 @@ def generate_launch_description():
 
     delayed_mission = TimerAction(
         period=gz_delay,
-        actions=[ping360_nearest_node, net_approach_node, phase3_node],
+        actions=[
+            ping360_nearest_node,
+            sonoptix_perception_node,
+            net_approach_node,
+            phase3_node,
+        ],
     )
 
     # ── Assembly ──────────────────────────────────────────────────────────────

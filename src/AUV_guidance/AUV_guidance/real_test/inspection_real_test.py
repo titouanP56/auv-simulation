@@ -140,7 +140,7 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     if msg.width * msg.height == 0:
         return None, 0.0, None, None
 
-    # Déballage rapide du buffer binaire en tableau de float32
+    # Vectorised decode: unpack the binary buffer into a float32 array
     payload = np.frombuffer(msg.data, dtype=np.float32)
     floats_per_point = msg.point_step // 4
     points = payload.reshape(-1, floats_per_point)
@@ -149,11 +149,11 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     py = points[:, 1]
     pz = points[:, 2]
 
-    # Calculs vectoriels des distances et angles
+    # Vectorised distance and angle computation
     dists = np.sqrt(px**2 + py**2 + pz**2)
     angles = np.arctan2(py, px)
 
-    # Filtrage par masque booléen NumPy (équivalent aux filtres d'origine)
+    # Boolean mask filtering (equivalent to the original per-point filters)
     valid_mask = (dists >= 0.3) & (dists <= 7.0) & (np.abs(angles) <= 1.57) & np.isfinite(dists)
     
     if not np.any(valid_mask):
@@ -163,7 +163,7 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     valid_angles = angles[valid_mask]
     valid_pz = pz[valid_mask]
 
-    # Tri pour extraire le percentile inférieur (points les plus proches)
+    # Sort to extract the lower percentile (closest points to the AUV)
     sort_idx = np.argsort(valid_dists)
     n_use = max(1, int(len(sort_idx) * PERCENTILE_FRACTION))
     closest_idx = sort_idx[:n_use]
@@ -171,7 +171,7 @@ def _extract_wall_distance(msg: PointCloud2) -> tuple[float | None, float, float
     avg_dist = float(np.mean(valid_dists[closest_idx]))
     avg_angle = float(np.mean(valid_angles[closest_idx]))
 
-    # Séparation Top / Bottom pour le contrôle du Pitch en mode cône
+    # Split Top / Bottom to enable pitch control in cone mode
     top_mask = valid_pz > 0
     bot_mask = valid_pz < 0
 
@@ -252,7 +252,7 @@ class Phase3InspectionNode(Node):
         self.sim_time_elapsed_pub  = self.create_publisher(Float64, '/phase3/sim_time_elapsed',  10)
         self.rtf_pub               = self.create_publisher(Float64, '/phase3/real_time_factor', 10)
 
-        # ── TF2 & Relative Télémétrie ─────────────────────────────────────────
+        # ── TF2 & Relative telemetry ──────────────────────────────────────────
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.relative_pose_pub = self.create_publisher(PoseStamped, '/phase3/relative_pose', 10)

@@ -59,19 +59,19 @@ def generate_launch_description():
     #spawn_x   = NET_CENTER_X + spawn_dx
     #spawn_y   = NET_CENTER_Y + spawn_dy
 
-# Constantes
-    NET_SPAWN_RADIUS = 22.0   # Rayon fixe
+    # Constants
+    NET_SPAWN_RADIUS = 22.0   # fixed spawn radius [m]
     NET_CENTER_X     = 0.0
     NET_CENTER_Y     = 0.0
 
-# 1. On choisit un angle aléatoire entre 0 et 2*PI
+    # 1. Pick a random angle in [0, 2π]
     angle = random.uniform(0, 2 * math.pi)
 
-# 2. On calcule la position sur la circonférence
+    # 2. Compute the position on the circumference
     spawn_dx = NET_SPAWN_RADIUS * math.cos(angle)
     spawn_dy = NET_SPAWN_RADIUS * math.sin(angle)
 
-# 3. Position finale dans le monde
+    # 3. Final world position
     spawn_x = NET_CENTER_X + spawn_dx
     spawn_y = NET_CENTER_Y + spawn_dy
 

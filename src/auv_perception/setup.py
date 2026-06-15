@@ -35,6 +35,7 @@ setup(
             'bag_to_ply = auv_perception.bag_to_ply:main',
             'ping360_mapper_node = auv_perception.ping360_mapper_node:main',
             'ping360_nearest = auv_perception.ping360_nearest:main',
+            'sonoptix_perception = auv_perception.sonoptix_perception:main',
         ],
     },
 )

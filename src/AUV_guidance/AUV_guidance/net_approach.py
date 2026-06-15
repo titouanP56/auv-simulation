@@ -2,53 +2,43 @@
 """
 net_approach.py
 ===============
-Nœud ROS 2 de guidage pour la Phase 2 de la mission AUV : approche du filet
-d'aquaculture.
+ROS 2 guidance node for Phase 2 of the AUV mission: approach to the
+aquaculture net.
 
-Machine à états
----------------
-  DESCENDING   → Descente à la profondeur cible et maintien.
-  GLOBAL_SEARCH → Maintien en place pendant qu'un tour 360° complet du sonar
-                  est effectué par ping360_nearest. L'AUV NE BOUGE PAS latérale-
-                  ment : la perception accumule un tour complet et publie une
-                  estimation robuste (signal /perception/full_scan_ready = True).
-                  Dès que ce signal est reçu avec une orientation valide sur
-                  /perception/net_orientation, on passe immédiatement en ALIGNING
-                  sans attendre d'autres estimations ni calculer de médiane.
-  ALIGNING     → PD sur le lacet jusqu'à l'alignement face au filet.
-  APPROACHING  → Avance vers le filet jusqu'à la distance de standoff.
-  STABILIZING  → Maintien de la position standoff pendant STABILIZE_TIME secondes.
-  STANDOFF     → État final : publication continue de l'origine locale (Phase 3).
+State machine
+-------------
+  DESCENDING    → Descend to target depth and hold.
+  GLOBAL_SEARCH → Hold position while a full 360° sonar rotation is completed
+                  by ping360_nearest. The AUV does NOT move laterally: the
+                  perception node accumulates a full rotation and publishes a
+                  robust estimate (signal /perception/full_scan_ready = True).
+                  As soon as this signal is received alongside a valid orientation
+                  on /perception/net_orientation, the node immediately transitions
+                  to ALIGNING without waiting for further estimates.
+  ALIGNING      → PD control on yaw until the robot faces the net.
+  APPROACHING   → Advance toward the net until standoff distance is reached.
+  STABILIZING   → Hold standoff position for STABILIZE_TIME seconds.
+  STANDOFF      → Final state: continuously broadcast local origin TF for Phase 3.
 
-Modifications v2
-----------------
-- Suppression de l'état SCANNING et de son filtre médian (statistiques.median
-  sur SCAN_MIN_ESTIMATES estimations).
-- Nouvel état GLOBAL_SEARCH : transition immédiate vers ALIGNING dès la
-  première estimation issue d'un tour complet (signalée par
-  /perception/full_scan_ready).
-- Souscription au topic /perception/full_scan_ready (std_msgs/Bool).
-
-Topics ROS 2
+ROS 2 Topics
 ------------
-  Entrées :
+  Inputs:
     /odometry/filtered              → nav_msgs/Odometry
     /perception/net_orientation     → geometry_msgs/PoseStamped
     /perception/full_scan_ready     → std_msgs/Bool
     /sonoptix/points                → sensor_msgs/PointCloud2
 
-  Sorties :
+  Outputs:
     /auv/command_wrench             → geometry_msgs/Wrench
     /mission/phase                  → std_msgs/String
     /mission/phase2_done            → std_msgs/Bool
     /mission/local_origin           → geometry_msgs/PoseStamped
 
-Auteur  : titou
+Author  : titou
 Package : AUV_guidance
 """
 
 import math
-import struct
 import numpy as np
 
 import rclpy
@@ -57,63 +47,64 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 
 from std_msgs.msg import Float64, Bool, String
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import PointCloud2
 from geometry_msgs.msg import TransformStamped, PoseStamped, Wrench
 from tf2_ros import TransformBroadcaster
 
 
-# ── Constantes ─────────────────────────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────────────────────────
 
-TARGET_DEPTH      = -2.0    # [m] profondeur cible
-DEPTH_TOLERANCE   = 0.2     # [m] tolérance d'erreur de profondeur
-DEPTH_HOLD_TIME   = 2.0     # [s] durée de stabilisation de profondeur requise
+TARGET_DEPTH      = -2.0    # [m] target depth
+DEPTH_TOLERANCE   = 0.2     # [m] acceptable depth error
+DEPTH_HOLD_TIME   = 2.0     # [s] required duration at target depth before transitioning
 
-YAW_TOLERANCE     = math.radians(10.0)   # [rad] tolérance d'erreur de lacet
-YAW_HOLD_TIME     = 1.0                  # [s] durée de maintien d'alignement
+YAW_TOLERANCE     = math.radians(10.0)   # [rad] acceptable yaw error
+YAW_HOLD_TIME     = 1.0                  # [s] required duration aligned before transitioning
 
-STANDOFF_DIST     = 1.5     # [m] distance de standoff face au filet
-APPROACH_TOL      = 0.10    # [m] tolérance d'atteinte du standoff
-STABILIZE_TIME    = 3.0     # [s] temps de stabilisation avant fin de phase
+STANDOFF_DIST     = 1.5     # [m] desired standoff distance from the net
+APPROACH_TOL      = 0.10    # [m] distance tolerance to accept standoff as reached
+STABILIZE_TIME    = 3.0     # [s] stabilisation duration before Phase 2 ends
 
-# ── Gains P/PD ─────────────────────────────────────────────────────────────────
+# ── Controller gains ───────────────────────────────────────────────────────────
 KP_DEPTH              = 15.0
-BUOYANCY_COMPENSATION = 3.0    # [N] compensation statique de la flottabilité
+BUOYANCY_COMPENSATION = 3.0    # [N] static buoyancy correction
 KP_YAW                = 5.0
 KD_YAW                = 2.0
 KP_SURGE              = 6.0
 
-# ── Limites de commande ────────────────────────────────────────────────────────
+# ── Command limits ─────────────────────────────────────────────────────────────
 MAX_DEPTH_CMD  = 20.0   # [N]
 MAX_YAW_CMD    = 40.0   # [N·m]
 MAX_SURGE_CMD  = 25.0   # [N]
 
-# ── Sonoptix (sonar avant pour la distance au filet) ──────────────────────────
-SONOPTIX_BORESIGHT_HALF_ANGLE = math.radians(20.0)
+# ── Sonoptix (net distance — provided by sonoptix_perception node) ─────────────
+# PointCloud2 processing is delegated to auv_perception/sonoptix_perception.
+# This node only subscribes to /sonoptix/perception (PoseStamped) and
+# /sonoptix/perception_valid (Bool).
 
-# ── Contrôle ──────────────────────────────────────────────────────────────────
+# ── Control ────────────────────────────────────────────────────────────────────
 CONTROL_RATE_HZ = 10.0
 
-# ── Timeout GLOBAL_SEARCH ─────────────────────────────────────────────────────
-# Si aucune estimation n'est reçue après ce délai, on affiche une alerte et
-# on réarme le timer (sans blocage définitif).
+# ── GLOBAL_SEARCH timeout ──────────────────────────────────────────────────────
+# If no estimate is received after this delay, emit a warning and reset the
+# timer (no hard lock-up).
 GLOBAL_SEARCH_TIMEOUT_SEC = 60.0   # [s]
 
 
-# ── États de la machine à états ───────────────────────────────────────────────
+# ── State machine labels ───────────────────────────────────────────────────────
 
 class State:
     DESCENDING    = "DESCENDING"
-    GLOBAL_SEARCH = "GLOBAL_SEARCH"   # Remplace SCANNING : attend 1 tour complet
+    GLOBAL_SEARCH = "GLOBAL_SEARCH"   # Replaces SCANNING: waits for one full rotation
     ALIGNING      = "ALIGNING"
     APPROACHING   = "APPROACHING"
     STABILIZING   = "STABILIZING"
     STANDOFF      = "STANDOFF"
 
 
-# ── Fonctions utilitaires ─────────────────────────────────────────────────────
+# ── Utility functions ──────────────────────────────────────────────────────────
 
 def _yaw_from_odom(odom: Odometry) -> float:
-    """Extrait le yaw courant depuis la quaternion de l'odométrie."""
+    """Extract the current yaw from the odometry quaternion."""
     q = odom.pose.pose.orientation
     siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
     cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
@@ -121,66 +112,24 @@ def _yaw_from_odom(odom: Odometry) -> float:
 
 
 def _angle_diff(a: float, b: float) -> float:
-    """Différence d'angles normalisée dans [-π, π]."""
+    """Normalised signed angle difference a − b in [-π, π]."""
     return math.atan2(math.sin(a - b), math.cos(a - b))
 
 
-def _min_sonoptix_range(msg: PointCloud2) -> float | None:
-    """
-    Extrait la distance minimale du nuage de points Sonoptix dans le cône
-    frontal du robot (±SONOPTIX_BORESIGHT_HALF_ANGLE).
-
-    Retourne None si aucun point valide n'est trouvé dans le cône.
-    """
-    field_map = {f.name: f for f in msg.fields}
-    if 'x' not in field_map or 'y' not in field_map or 'z' not in field_map:
-        return None
-
-    x_off      = field_map['x'].offset
-    y_off      = field_map['y'].offset
-    z_off      = field_map['z'].offset
-    point_step = msg.point_step
-    data       = msg.data
-
-    min_range = float('inf')
-    for i in range(msg.width * msg.height):
-        base = i * point_step
-        try:
-            px = struct.unpack_from('f', data, base + x_off)[0]
-            py = struct.unpack_from('f', data, base + y_off)[0]
-            pz = struct.unpack_from('f', data, base + z_off)[0]
-        except struct.error:
-            continue
-
-        if not (math.isfinite(px) and math.isfinite(py) and math.isfinite(pz)):
-            continue
-
-        horiz_angle = abs(math.atan2(py, px))
-        if horiz_angle > SONOPTIX_BORESIGHT_HALF_ANGLE:
-            continue
-
-        r = math.sqrt(px * px + py * py + pz * pz)
-        if r > 0.01:
-            min_range = min(min_range, r)
-
-    return min_range if math.isfinite(min_range) else None
-
-
-# ── Nœud principal ─────────────────────────────────────────────────────────────
+# ── Main node ──────────────────────────────────────────────────────────────────
 
 class Phase2MissionNode(Node):
     """
-    Nœud ROS 2 de guidage pour la Phase 2 de la mission AUV (approche filet).
+    ROS 2 guidance node for Phase 2 of the AUV mission (net approach).
 
-    Machine à états :
+    State machine:
       DESCENDING → GLOBAL_SEARCH → ALIGNING → APPROACHING → STABILIZING → STANDOFF
 
-    Différences par rapport à la version précédente :
-    - L'état SCANNING est remplacé par GLOBAL_SEARCH.
-    - Pas de filtre médian : la transition vers ALIGNING se fait dès la
-      première estimation robuste (tour complet, signalée par le topic Bool
-      /perception/full_scan_ready).
-    - Le yaw cible est extrait directement du PoseStamped de la perception.
+    Key design choices:
+    - SCANNING replaced by GLOBAL_SEARCH (no median filter over multiple scans).
+    - Transition to ALIGNING fires immediately on the first robust estimate from a
+      full sonar rotation (signalled by /perception/full_scan_ready Bool topic).
+    - Target yaw is extracted directly from the perception PoseStamped.
     """
 
     def __init__(self) -> None:
@@ -193,7 +142,7 @@ class Phase2MissionNode(Node):
             depth=1,
         )
 
-        # ── Souscriptions ───────────────────────────────────────────────────
+        # ── Subscriptions ───────────────────────────────────────────────────
         self.odom_sub = self.create_subscription(
             Odometry,
             '/odometry/filtered',
@@ -201,7 +150,7 @@ class Phase2MissionNode(Node):
             10,
         )
 
-        # Orientation du filet (PoseStamped) depuis ping360_nearest
+        # Net orientation (PoseStamped) from ping360_nearest
         self.ping360_sub = self.create_subscription(
             PoseStamped,
             '/perception/net_orientation',
@@ -209,8 +158,8 @@ class Phase2MissionNode(Node):
             best_effort_qos,
         )
 
-        # Signal "tour complet prêt" depuis ping360_nearest
-        # Reçoit True quand une estimation fraîche 360° vient d'être publiée.
+        # "Full rotation ready" signal from ping360_nearest.
+        # Receives True when a fresh 360° estimate has just been published.
         self.full_scan_sub = self.create_subscription(
             Bool,
             '/perception/full_scan_ready',
@@ -218,14 +167,21 @@ class Phase2MissionNode(Node):
             best_effort_qos,
         )
 
-        self.sonoptix_sub = self.create_subscription(
-            PointCloud2,
-            '/sonoptix/points',
-            self._sonoptix_cb,
+        # Perception results from sonoptix_perception
+        self.perception_sub = self.create_subscription(
+            PoseStamped,
+            '/sonoptix/perception',
+            self._perception_cb,
+            best_effort_qos,
+        )
+        self.perception_valid_sub = self.create_subscription(
+            Bool,
+            '/sonoptix/perception_valid',
+            self._perception_valid_cb,
             best_effort_qos,
         )
 
-        # ── Publications ─────────────────────────────────────────────────────
+        # ── Publishers ─────────────────────────────────────────────────────
         self.wrench_pub = self.create_publisher(Wrench, '/auv/command_wrench', 10)
 
         latching_qos = QoSProfile(
@@ -239,57 +195,57 @@ class Phase2MissionNode(Node):
         self.origin_pub = self.create_publisher(PoseStamped, '/mission/local_origin', latching_qos)
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # ── État interne ─────────────────────────────────────────────────────
+        # ── Internal state ──────────────────────────────────────────────────
         self.state: str = State.DESCENDING
 
-        # Odométrie
+        # Odometry
         self.current_x    = 0.0
         self.current_y    = 0.0
         self.current_z    = 0.0
         self.current_yaw  = 0.0
         self.current_vyaw = 0.0
 
-        # Cible de lacet (déterminée en GLOBAL_SEARCH, utilisée en ALIGNING+)
+        # Target yaw (determined in GLOBAL_SEARCH, used from ALIGNING onwards)
         self.target_yaw: float = 0.0
 
-        # Distance Sonoptix (mise à jour en APPROACHING et STABILIZING)
+        # Net distance from sonoptix_perception (updated in APPROACHING/STABILIZING)
         self.sonoptix_range: float | None = None
+        self._perception_valid: bool = False
 
-        # Drapeaux de disponibilité des données
+        # Data availability flags
         self._have_odom:   bool = False
-        self._have_orient: bool = False   # True dès réception d'une orientation valide
+        self._have_orient: bool = False   # True once a valid orientation has been received
 
-        # ── État GLOBAL_SEARCH ───────────────────────────────────────────────
-        # _pending_yaw      : dernière orientation reçue de ping360_nearest,
-        #                     en attente de la confirmation "full_scan_ready".
-        # _pending_yaw_valid: True si _pending_yaw a été rempli.
-        # _full_scan_flag   : True si le topic /perception/full_scan_ready
-        #                     vient de signaler un tour complet.
-        # _search_start_time: timestamp de début de GLOBAL_SEARCH (pour timeout).
+        # ── GLOBAL_SEARCH state ──────────────────────────────────────────────
+        # _pending_yaw       : latest orientation from ping360_nearest,
+        #                      waiting for confirmation via full_scan_ready.
+        # _pending_yaw_valid : True if _pending_yaw has been populated.
+        # _full_scan_flag    : True if /perception/full_scan_ready just fired.
+        # _search_start_time : timestamp of GLOBAL_SEARCH entry (for timeout).
         self._pending_yaw:        float       = 0.0
         self._pending_yaw_valid:  bool        = False
         self._full_scan_flag:     bool        = False
         self._search_start_time:  float | None = None
-        # Timestamp de la première orientation reçue (pour le fallback)
+        # Timestamp of the first received orientation (for fallback logic)
         self._orient_received_at: float | None = None
 
-        # Timers de stabilisation
+        # Stabilisation timers
         self._depth_ok_since:    float | None = None
         self._yaw_ok_since:      float | None = None
         self._stabilize_start:   float | None = None
 
-        # ── Timer de contrôle ─────────────────────────────────────────────────
+        # ── Control timer ────────────────────────────────────────────────────
         self.declare_parameter('control_rate_hz', CONTROL_RATE_HZ)
         _rate = float(self.get_parameter('control_rate_hz').value)
         self.timer = self.create_timer(1.0 / _rate, self._control_loop)
 
         self._publish_done_status()
         self.get_logger().info(
-            f"[Phase2MissionNode] Démarré → état initial : DESCENDING "
-            f"(taux de contrôle = {_rate:.0f} Hz)\n"
-            f"  Profondeur cible : {TARGET_DEPTH} m\n"
-            f"  Standoff         : {STANDOFF_DIST} m\n"
-            f"  Timeout recherche: {GLOBAL_SEARCH_TIMEOUT_SEC} s"
+            f"[Phase2MissionNode] Started → initial state: DESCENDING "
+            f"(control rate = {_rate:.0f} Hz)\n"
+            f"  Target depth   : {TARGET_DEPTH} m\n"
+            f"  Standoff dist  : {STANDOFF_DIST} m\n"
+            f"  Search timeout : {GLOBAL_SEARCH_TIMEOUT_SEC} s"
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -297,7 +253,7 @@ class Phase2MissionNode(Node):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _odom_cb(self, msg: Odometry) -> None:
-        """Met à jour la pose et la vitesse de lacet courantes."""
+        """Update current pose and yaw rate from the filtered odometry."""
         self.current_x    = msg.pose.pose.position.x
         self.current_y    = msg.pose.pose.position.y
         self.current_z    = msg.pose.pose.position.z
@@ -307,19 +263,20 @@ class Phase2MissionNode(Node):
 
     def _net_orientation_cb(self, msg: PoseStamped) -> None:
         """
-        Callback pour /perception/net_orientation (depuis ping360_nearest).
+        Callback for /perception/net_orientation (from ping360_nearest).
 
-        On stocke le yaw en tant qu'estimation "en attente". La transition
-        vers ALIGNING ne sera déclenchée que si _full_scan_flag est aussi
-        True (i.e., le signal /perception/full_scan_ready a été reçu).
+        The received yaw is stored as a pending estimate. The transition to
+        ALIGNING is only triggered once _full_scan_flag is also set (i.e. the
+        /perception/full_scan_ready signal has been received), ensuring the
+        estimate comes from a complete rotation.
 
-        On ignore les messages reçus dans des états autres que GLOBAL_SEARCH
-        afin d'éviter de modifier le yaw cible une fois l'alignement commencé.
+        Messages received in states other than GLOBAL_SEARCH are discarded
+        to avoid overwriting the target yaw once alignment has begun.
         """
         if self.state != State.GLOBAL_SEARCH:
             return
 
-        # Extraction du yaw depuis le quaternion (roll = pitch = 0)
+        # Extract yaw from the quaternion (roll = pitch = 0)
         q = msg.pose.orientation
         world_yaw = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
@@ -330,80 +287,85 @@ class Phase2MissionNode(Node):
         self._pending_yaw_valid = True
 
         self.get_logger().debug(
-            f"[GLOBAL_SEARCH] Orientation reçue : "
-            f"yaw_filet={math.degrees(world_yaw):.1f}°  "
-            f"pt_filet=({msg.pose.position.x:.2f}, {msg.pose.position.y:.2f})  "
+            f"[GLOBAL_SEARCH] Orientation received: "
+            f"net_yaw={math.degrees(world_yaw):.1f}°  "
+            f"net_pt=({msg.pose.position.x:.2f}, {msg.pose.position.y:.2f})  "
             f"full_scan_ready={self._full_scan_flag}"
         )
 
-        # Tentative de transition immédiate si le signal "tour complet" est
-        # déjà arrivé avant ce message (cas possible selon l'ordre de livraison)
+        # Attempt immediate transition in case the full_scan_ready signal
+        # arrived before this message (possible with Best-Effort QoS ordering).
         self._try_transition_to_aligning()
 
     def _full_scan_ready_cb(self, msg: Bool) -> None:
         """
-        Callback pour /perception/full_scan_ready.
+        Callback for /perception/full_scan_ready.
 
-        Reçoit True quand ping360_nearest a terminé un tour complet et a
-        publié une estimation fraîche. On lève le drapeau _full_scan_flag
-        puis on tente la transition.
+        Receives True when ping360_nearest has completed a full rotation and
+        published a fresh estimate. Raise the _full_scan_flag and attempt
+        the transition to ALIGNING.
         """
         if not msg.data:
-            return   # on ignore les False
+            return   # ignore False messages
 
         if self.state != State.GLOBAL_SEARCH:
             return
 
         self._full_scan_flag = True
         self.get_logger().info(
-            "[GLOBAL_SEARCH] Signal 'full_scan_ready' reçu → "
-            f"estimation valide = {self._pending_yaw_valid}"
+            "[GLOBAL_SEARCH] 'full_scan_ready' signal received → "
+            f"valid orientation available: {self._pending_yaw_valid}"
         )
 
         self._try_transition_to_aligning()
 
     def _try_transition_to_aligning(self) -> None:
         """
-        Déclenche la transition GLOBAL_SEARCH → ALIGNING dès qu'une orientation
-        valide est disponible.
+        Trigger the GLOBAL_SEARCH → ALIGNING transition as soon as a valid
+        orientation estimate is available.
 
-        On ne bloque plus sur _full_scan_flag : ping360_nearest publie les deux
-        topics (/perception/net_orientation et /perception/full_scan_ready) de
-        manière quasi-simultanée. Attendre les deux créait un possible deadlock
-        si l'un des deux messages était perdu (QoS Best-Effort).
+        Note: we no longer gate on _full_scan_flag because ping360_nearest
+        publishes both topics (/perception/net_orientation and
+        /perception/full_scan_ready) nearly simultaneously, and waiting for
+        both could dead-lock if one message is dropped (Best-Effort QoS).
 
-        Le fait que ping360_nearest exécute son pipeline uniquement à la fin
-        d'un tour (ou toutes les _min_period_sec secondes avec le fallback)
-        garantit déjà la qualité de l'estimation.
+        The quality of the estimate is already guaranteed by the fact that
+        ping360_nearest only runs its pipeline at the end of a full rotation
+        (or every _min_period_sec via the temporal fallback).
         """
         if self._pending_yaw_valid:
             self.target_yaw = self._pending_yaw
             self.get_logger().info(
-                f"[GLOBAL_SEARCH → ALIGNING] Estimation reçue. "
-                f"Yaw cible : {math.degrees(self.target_yaw):.1f}°  "
+                f"[GLOBAL_SEARCH → ALIGNING] Estimate received. "
+                f"Target yaw: {math.degrees(self.target_yaw):.1f}°  "
                 f"(full_scan_flag={self._full_scan_flag})"
             )
             self.state = State.ALIGNING
 
-            # Réinitialisation des flags
+            # Reset flags
             self._pending_yaw_valid = False
             self._full_scan_flag    = False
             self._search_start_time = None
 
-    def _sonoptix_cb(self, msg: PointCloud2) -> None:
+    def _perception_cb(self, msg: PoseStamped) -> None:
         """
-        Met à jour la distance au filet via le sonar Sonoptix frontal.
-        N'est actif qu'en phase d'approche et de stabilisation.
+        Receive perception output from sonoptix_perception.
+        The orthogonal distance to the net plane is in pose.position.x.
+        Only active during APPROACHING, STABILIZING, and STANDOFF.
         """
         if self.state in (State.APPROACHING, State.STABILIZING, State.STANDOFF):
-            self.sonoptix_range = _min_sonoptix_range(msg)
+            self.sonoptix_range = msg.pose.position.x
+
+    def _perception_valid_cb(self, msg: Bool) -> None:
+        """Track the validity flag from sonoptix_perception."""
+        self._perception_valid = msg.data
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Boucle de contrôle principale
+    # Main control loop
     # ─────────────────────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:
-        """Boucle de contrôle cadencée à CONTROL_RATE_HZ Hz."""
+        """Main control loop, called at CONTROL_RATE_HZ Hz."""
         if not self._have_odom:
             return
 
@@ -424,13 +386,13 @@ class Phase2MissionNode(Node):
             self._do_standoff()
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Handlers des états
+    # State handlers
     # ─────────────────────────────────────────────────────────────────────────
 
     def _do_descending(self) -> None:
         """
-        Descend à TARGET_DEPTH et passe en GLOBAL_SEARCH une fois la profondeur
-        stabilisée pendant DEPTH_HOLD_TIME secondes.
+        Descend to TARGET_DEPTH and transition to GLOBAL_SEARCH once depth
+        has been held within tolerance for DEPTH_HOLD_TIME seconds.
         """
         depth_error = TARGET_DEPTH - self.current_z
         depth_cmd   = float(np.clip(
@@ -447,7 +409,7 @@ class Phase2MissionNode(Node):
                 self._depth_ok_since = now
             elif (now - self._depth_ok_since) >= DEPTH_HOLD_TIME:
                 self.get_logger().info(
-                    f"[DESCENDING → GLOBAL_SEARCH] Profondeur stable : "
+                    f"[DESCENDING → GLOBAL_SEARCH] Depth stable at "
                     f"{self.current_z:.2f} m"
                 )
                 self.state = State.GLOBAL_SEARCH
@@ -457,34 +419,32 @@ class Phase2MissionNode(Node):
 
     def _do_global_search(self) -> None:
         """
-        Maintient l'AUV en place (profondeur + cap nul) pendant que le sonar
-        Ping360 effectue un tour complet.
+        Hold the AUV in place (depth + zero yaw rate) while the Ping360 sonar
+        completes a full 360° rotation.
 
-        La transition vers ALIGNING est déclenchée par les callbacks
-        (_net_orientation_cb et _full_scan_ready_cb) dès que les deux
-        conditions sont réunies.
+        The transition to ALIGNING is triggered by the callbacks
+        (_net_orientation_cb and _full_scan_ready_cb) once both conditions are met.
 
-        Un timeout GLOBAL_SEARCH_TIMEOUT_SEC est utilisé pour afficher
-        une alerte si aucune estimation n'est reçue (nœud perception
-        non démarré, TF manquant…).
+        A GLOBAL_SEARCH_TIMEOUT_SEC timeout emits an error log if no estimate
+        is received (e.g. perception node not running, TF tree missing).
         """
-        # Maintien de profondeur strict (Fx = 0 : pas de translation avant)
+        # Strict depth hold (Fx = 0: no forward translation)
         depth_error = TARGET_DEPTH - self.current_z
         depth_cmd   = float(np.clip(
             KP_DEPTH * depth_error - BUOYANCY_COMPENSATION,
             -MAX_DEPTH_CMD, MAX_DEPTH_CMD,
         ))
         self._set_Fz(depth_cmd)
-        self._set_Mz(0.0)   # pas de rotation non plus : le sonar balaie seul
+        self._set_Mz(0.0)   # no rotation either: let the sonar sweep on its own
         self._set_Fx(0.0)
 
         now = self.get_clock().now().nanoseconds * 1e-9
         if self._search_start_time is None:
             self._search_start_time = now
             self.get_logger().info(
-                "[GLOBAL_SEARCH] En attente d'une estimation robuste "
-                "depuis ping360_nearest (tour complet 360°)…\n"
-                "  L'AUV maintient sa position. Ne pas commander de mouvement."
+                "[GLOBAL_SEARCH] Waiting for a robust estimate from "
+                "ping360_nearest (full 360° rotation)…\n"
+                "  AUV holding position. Do not command any movement."
             )
 
         elapsed = now - self._search_start_time
@@ -492,19 +452,20 @@ class Phase2MissionNode(Node):
         # ── Timeout guard ─────────────────────────────────────────────────────
         if elapsed >= GLOBAL_SEARCH_TIMEOUT_SEC and not self._pending_yaw_valid:
             self.get_logger().error(
-                f"[GLOBAL_SEARCH] Timeout ({GLOBAL_SEARCH_TIMEOUT_SEC:.0f} s) : "
-                "aucune estimation reçue depuis /perception/net_orientation. "
-                "Vérifiez que ping360_nearest est actif et que TF2 est disponible."
+                f"[GLOBAL_SEARCH] Timeout ({GLOBAL_SEARCH_TIMEOUT_SEC:.0f} s): "
+                "no estimate received from /perception/net_orientation. "
+                "Check that ping360_nearest is running and TF2 is available."
             )
-            # Réarme le timer sans bloquer définitivement
+            # Reset timer — do not lock up the state machine permanently
             self._search_start_time = now
 
     def _do_aligning(self) -> None:
         """
-        Contrôle PD du lacet jusqu'à l'alignement face au filet.
+        PD yaw control until the robot faces the net.
 
-        La profondeur est maintenue ; aucun mouvement d'avance.
-        Passe en APPROACHING une fois le lacet stable pendant YAW_HOLD_TIME s.
+        Depth is maintained; no forward motion.
+        Transitions to APPROACHING once yaw error is within tolerance for
+        YAW_HOLD_TIME seconds.
         """
         depth_error = TARGET_DEPTH - self.current_z
         depth_cmd   = float(np.clip(
@@ -527,8 +488,8 @@ class Phase2MissionNode(Node):
                 self._yaw_ok_since = now
             elif (now - self._yaw_ok_since) >= YAW_HOLD_TIME:
                 self.get_logger().info(
-                    f"[ALIGNING → APPROACHING] Aligné : "
-                    f"erreur lacet = {math.degrees(yaw_error):.2f}°"
+                    f"[ALIGNING → APPROACHING] Aligned: "
+                    f"yaw error = {math.degrees(yaw_error):.2f}°"
                 )
                 self.state = State.APPROACHING
                 self._yaw_ok_since = None
@@ -537,11 +498,11 @@ class Phase2MissionNode(Node):
 
     def _do_approaching(self) -> None:
         """
-        Avance vers le filet en maintenant le cap et la profondeur.
+        Advance toward the net while maintaining heading and depth.
 
-        Si le Sonoptix n'est pas encore disponible, avance à 30 % de la
-        poussée maximale (mode aveugle temporaire).
-        Passe en STABILIZING lorsque la distance de standoff est atteinte.
+        If Sonoptix data is not yet available, advance at 30% of maximum
+        surge thrust (blind approach fallback).
+        Transitions to STABILIZING once the standoff distance is reached.
         """
         depth_error = TARGET_DEPTH - self.current_z
         depth_cmd   = float(np.clip(
@@ -558,7 +519,7 @@ class Phase2MissionNode(Node):
         self._set_Mz(mz_cmd)
 
         if self.sonoptix_range is None:
-            # Pas encore de mesure de distance → avance lente
+            # No distance measurement yet → slow blind advance
             self._set_Fx(MAX_SURGE_CMD * 0.3)
             return
 
@@ -570,16 +531,16 @@ class Phase2MissionNode(Node):
 
         if (self.sonoptix_range - STANDOFF_DIST) <= APPROACH_TOL:
             self.get_logger().info(
-                f"[APPROACHING → STABILIZING] Distance standoff atteinte : "
-                f"{self.sonoptix_range:.2f} m. Stabilisation…"
+                f"[APPROACHING → STABILIZING] Standoff distance reached: "
+                f"{self.sonoptix_range:.2f} m. Stabilising…"
             )
             self.state = State.STABILIZING
             self._stabilize_start = self.get_clock().now().nanoseconds * 1e-9
 
     def _do_stabilizing(self) -> None:
         """
-        Maintient la position standoff pendant STABILIZE_TIME secondes.
-        Passe ensuite en STANDOFF et publie l'origine locale pour la Phase 3.
+        Hold the standoff position for STABILIZE_TIME seconds.
+        Then transition to STANDOFF and broadcast the local origin for Phase 3.
         """
         depth_error = TARGET_DEPTH - self.current_z
         depth_cmd   = float(np.clip(
@@ -607,15 +568,15 @@ class Phase2MissionNode(Node):
         now = self.get_clock().now().nanoseconds * 1e-9
         if self._stabilize_start and (now - self._stabilize_start) >= STABILIZE_TIME:
             self.get_logger().info(
-                "[STABILIZING → STANDOFF] Robot stabilisé. Définition de l'origine locale."
+                "[STABILIZING → STANDOFF] Robot stabilised. Defining local origin."
             )
             self._define_local_origin()
             self.state = State.STANDOFF
 
     def _do_standoff(self) -> None:
         """
-        État final : publication continue de l'origine locale et du TF
-        pour la Phase 3 d'inspection.
+        Final state: continuously broadcast the local origin pose and TF
+        for the Phase 3 inspection node.
         """
         if hasattr(self, '_local_origin_pose'):
             self._local_origin_pose.header.stamp = self.get_clock().now().to_msg()
@@ -626,27 +587,26 @@ class Phase2MissionNode(Node):
             self.tf_broadcaster.sendTransform(self._local_origin_transform)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Définition de l'origine locale (transition vers Phase 3)
+    # Local origin definition (Phase 2 → Phase 3 handoff)
     # ─────────────────────────────────────────────────────────────────────────
 
     def _define_local_origin(self) -> None:
         """
-        Calcule et stocke l'origine du repère local (local_origin) utilisé
-        par la Phase 3. L'origine est placée au point standoff projeté sur
-        le filet, face à l'AUV.
+        Compute and store the local_origin frame used by Phase 3. The origin is
+        placed at the standoff point projected onto the net surface, facing the AUV.
         """
         origin_x   = self.current_x + STANDOFF_DIST * math.cos(self.target_yaw)
         origin_y   = self.current_y + STANDOFF_DIST * math.sin(self.target_yaw)
         origin_z   = self.current_z
-        origin_yaw = self.target_yaw + math.pi   # face à l'AUV
+        origin_yaw = self.target_yaw + math.pi   # face the AUV from the net
 
         self.get_logger().info(
-            f"[PHASE 3] Origine locale : "
+            f"[PHASE 3] Local origin defined: "
             f"x={origin_x:.2f}  y={origin_y:.2f}  z={origin_z:.2f}  "
             f"yaw={math.degrees(origin_yaw):.1f}°"
         )
 
-        # ── TF ────────────────────────────────────────────────────────────────
+        # ── TF transform ───────────────────────────────────────────────────────
         tf_msg = TransformStamped()
         tf_msg.header.frame_id    = 'odom'
         tf_msg.child_frame_id     = 'local_origin'
@@ -659,7 +619,7 @@ class Phase2MissionNode(Node):
         tf_msg.transform.rotation.w = math.cos(origin_yaw / 2.0)
         self._local_origin_transform = tf_msg
 
-        # ── PoseStamped ───────────────────────────────────────────────────────
+        # ── PoseStamped ────────────────────────────────────────────────────────
         pose_msg = PoseStamped()
         pose_msg.header.frame_id         = 'odom'
         pose_msg.pose.position.x         = origin_x
@@ -672,7 +632,7 @@ class Phase2MissionNode(Node):
         self._local_origin_pose = pose_msg
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Helpers de commande
+    # Command helpers
     # ─────────────────────────────────────────────────────────────────────────
 
     def _set_Fz(self, fz: float) -> None:
@@ -685,18 +645,18 @@ class Phase2MissionNode(Node):
         self._cmd_Fx = float(fx)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Publications d'état
+    # State publishers
     # ─────────────────────────────────────────────────────────────────────────
 
     def _publish_done_status(self) -> None:
-        """Publie True sur /mission/phase2_done lorsque l'état STANDOFF est atteint."""
+        """Publish True on /mission/phase2_done when STANDOFF state is reached."""
         done_msg = Bool()
         done_msg.data = (self.state == State.STANDOFF)
         self.done_pub.publish(done_msg)
 
     def _publish_state(self) -> None:
-        """Publie le nom de l'état courant et les commandes Wrench calculées."""
-        # En état STANDOFF, on ne publie plus de Wrench (contrôle MPC actif)
+        """Publish the current state name and the computed Wrench command."""
+        # In STANDOFF the guidance wrench is zeroed (Phase 3 takes over control)
         if self.state == State.STANDOFF:
             phase_msg = String()
             phase_msg.data = self.state
@@ -714,7 +674,7 @@ class Phase2MissionNode(Node):
         wrench_msg.torque.z = Mz
         self.wrench_pub.publish(wrench_msg)
 
-        # Remise à zéro des commandes pour éviter une répétition accidentelle
+        # Reset commands to avoid unintended repetition next cycle
         self._cmd_Fx = 0.0
         self._cmd_Fz = 0.0
         self._cmd_Mz = 0.0
@@ -724,16 +684,16 @@ class Phase2MissionNode(Node):
         self.phase_pub.publish(phase_msg)
 
 
-# ── Point d'entrée ─────────────────────────────────────────────────────────────
+# ── Entry point ────────────────────────────────────────────────────────────────
 
 def main(args=None) -> None:
-    """Point d'entrée standard ROS 2."""
+    """Standard ROS 2 entry point."""
     rclpy.init(args=args)
     node = Phase2MissionNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("[Phase2MissionNode] Interruption clavier — arrêt propre.")
+        node.get_logger().info("[Phase2MissionNode] Keyboard interrupt — shutting down.")
     finally:
         try:
             node.destroy_node()
