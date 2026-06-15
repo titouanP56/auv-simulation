@@ -1,87 +1,158 @@
 # AUV Perception
 
-> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+> **Tested on:** ROS 2 **Jazzy** · Gazebo **Harmonic** · Ubuntu 24.04 LTS
 
-## 1. Introduction for Beginners
-
-Welcome to the **AUV Perception** package! This package acts as the "eyes and memory" of the underwater robot.
-
-When the robot swims around the aquaculture net, it receives thousands of data points every second from its sonar (like an underwater radar). This package is responsible for:
-1. **Filtering the noise**: Removing echoes from things that are too far away or irrelevant.
-2. **Understanding the shape**: Analyzing the filtered sonar points to figure out exactly how the net is angled relative to the robot.
-3. **Saving memories**: Taking the 3D map that the robot builds as it swims (using a tool called OctoMap) and automatically saving it to the computer's hard drive so it doesn't get lost when we turn the robot off.
+This package is the **sensing layer** of the AUV stack. It processes raw sonar data from two sensors and publishes clean, actionable results to the guidance nodes.
 
 ---
 
-## 2. Quick Start Guide
+## Package Contents
 
-### Prerequisites
-Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
+| Node / executable | Sensor | Output |
+|---|---|---|
+| `ping360_nearest` | Ping360 (2D rotating sonar) | Net orientation & distance — used by Phase 2 approach |
+| `sonoptix_perception` | Sonoptix Echo (3D multibeam) | Net distance + normal vector — used by Phase 3 inspection |
+| `auto_saver_node` | OctoMap map server | Periodically saves the 3D net map as a `.bt` file |
+
+---
+
+## Quick Start
+
+These nodes are launched automatically by the main mission files. To run them individually for testing:
 
 ```bash
 cd ~/AUV_project/ros2_AUV
 colcon build --packages-select auv_perception
 source install/setup.bash
-```
 
-### Running the Nodes
+# Ping360 net finder (requires /ping360/scan to be publishing)
+ros2 run auv_perception ping360_nearest
 
-These nodes are usually launched automatically by the main mission launch files, but you can run them individually for testing:
+# Sonoptix plane estimator (requires /sonoptix/points to be publishing)
+ros2 run auv_perception sonoptix_perception
 
-**1. Run the Sonar Filter:**
-Filters out sonar points beyond 4.0 meters.
-```bash
-ros2 run auv_perception sonar_filter_node
-```
-
-**2. Run the Net Local Estimator:**
-Analyzes the filtered points to estimate the net's pose.
-```bash
-ros2 run auv_perception net_local_estimator
-```
-
-**3. Run the Auto Saver:**
-Automatically saves the OctoMap every 60 seconds.
-```bash
+# OctoMap Auto-Saver (requires octomap_server to be running)
 ros2 run auv_perception auto_saver_node
 ```
 
 ---
 
-## 3. Technical Architecture
+## Node Reference
 
-This package contains lightweight, specialized Python nodes that process `sensor_msgs/PointCloud2` data and manage system-level save operations.
+### `ping360_nearest` — Net Orientation Estimator
 
-### Core Nodes
+**Purpose:** Finds the net's direction relative to the robot using the 360° Ping360 sonar scan.
 
-1. **`sonar_filter_node`**: 
-   - **Role**: Distance-based filtering of the raw Sonoptix point cloud.
-   - **Logic**: Converts the `PointCloud2` into a numpy structured array, calculates the Euclidean distance for every point, and drops points where $D > 4.0$ meters.
-   - **Output**: Publishes `/sonoptix/points_filtered`.
+**Algorithm:**
+1. Receives a `sensor_msgs/LaserScan` from the Ping360.
+2. Converts valid beams into (x, y) Cartesian points (clipping at `max_range_m`).
+3. Runs **DBSCAN clustering** to separate net echoes from noise/fish.
+4. Selects the dominant cluster (closest valid cluster to the robot).
+5. Accumulates a full **360° scan rotation** before publishing a result.
+6. Publishes the net yaw angle and nearest point as a `geometry_msgs/PoseStamped`.
+7. Also publishes `std_msgs/Bool` on `/perception/full_scan_ready` when a complete rotation is done.
 
-2. **`net_local_estimator`**:
-   - **Role**: Estimates the localized pose of the net surface relative to the robot.
-   - **Logic**: Takes the filtered point cloud, restricts points to a $\pm 45^\circ$ horizontal cone, and uses Principal Component Analysis (PCA) to perform a robust 2D line fit. The smallest eigenvector provides the normal vector to the net. It applies a moving-average filter (window=5) to smooth the calculated distance and yaw.
-   - **Output**: Publishes a `geometry_msgs/PoseStamped` on `/perception/net_local_frame` representing the closest point on the net and its normal orientation.
+**Key parameters (settable at launch):**
 
-3. **`auto_saver_node`**:
-   - **Role**: Persistent storage of the OctoMap.
-   - **Logic**: Uses a ROS 2 timer to trigger a system `subprocess` every 60 seconds. It calls the `octomap_saver_node` executable to save the current `.bt` file into the `auv_perception` source directory. Captures `KeyboardInterrupt` (Ctrl+C) to guarantee a final save on shutdown.
+| Parameter | Default | Description |
+|---|---|---|
+| `max_range_m` | `10.0` | Ignore Ping360 returns beyond this distance |
+| `min_intensity` | `0` | Minimum beam intensity to consider valid |
+| `dbscan_eps` | `0.5` | DBSCAN neighbourhood radius [m] |
+| `dbscan_min_samples` | `3` | DBSCAN minimum cluster size |
 
-### Subscribed Topics
-- `/sonoptix/points` (`sensor_msgs/PointCloud2`): Raw sonar point cloud.
-- `/sonoptix/points_filtered` (`sensor_msgs/PointCloud2`): Filtered sonar data (used by the estimator).
+**Topics:**
 
-### Published Topics
-- `/sonoptix/points_filtered` (`sensor_msgs/PointCloud2`): Output of the filter node.
-- `/perception/net_local_frame` (`geometry_msgs/PoseStamped`): Estimated pose of the net.
+| Direction | Topic | Type |
+|---|---|---|
+| Subscribe | `/ping360/scan` | `sensor_msgs/LaserScan` |
+| Publish | `/perception/net_orientation` | `geometry_msgs/PoseStamped` |
+| Publish | `/perception/full_scan_ready` | `std_msgs/Bool` |
 
 ---
 
-## 4. Maintenance Guide
+### `sonoptix_perception` — 3D Plane Estimator (RANSAC)
 
-If you are a developer taking over this project, here is how you can modify or improve the perception code:
+**Purpose:** Estimates the net surface's distance and orientation from the 3D Sonoptix sonar point cloud, producing a clean `PoseStamped` for the Phase 3 orbit controller.
 
-- **Adjusting the Sonar Filter Distance**: Open `sonar_filter_node.py` and modify the condition `distances <= 4.0`. If you are testing in a very large environment, you may want to increase this threshold.
-- **Tuning the Net Estimator Smoothing**: In `net_local_estimator.py`, the `deque` sizes for `distance_history` and `angle_history` dictate how much the normal vector is smoothed. Increase `maxlen=5` for a smoother but more sluggish response.
-- **Changing the Map Save Location**: The `auto_saver_node.py` dynamically resolves the package path to save `net_map_autosave.bt` directly into the `src/auv_perception` folder. If this fails, it defaults to your home directory (`~/net_map_autosave.bt`). You can modify the `save_path` variable to target a dedicated logging directory.
+**Algorithm:**
+1. Receives a `sensor_msgs/PointCloud2` from the Sonoptix.
+2. Decodes the binary buffer into a NumPy (N, 3) float32 array.
+3. **Spatial culling:** removes NaN/inf and points outside `[min_range_m, max_range_m]`.
+4. **3D RANSAC plane fitting:**
+   - Primary backend: **Open3D** `segment_plane()` (C++, real-time capable)
+   - Fallback backend: **sklearn** `RANSACRegressor` (if Open3D not available)
+5. Encodes the plane normal `[nx, ny, nz]` as a ZYX quaternion (roll=0, pitch, yaw).
+6. Publishes distance and orientation on `/sonoptix/perception`.
+7. Publishes `True` on `/sonoptix/perception_valid` only if inlier ratio ≥ `min_inlier_ratio`.
+
+**Key parameters (settable at launch):**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `min_range_m` | `0.3` | Minimum valid sonar range [m] |
+| `max_range_m` | `7.0` | Maximum valid sonar range [m] |
+| `ransac_distance_threshold` | `0.05` | Max distance from plane for a point to be an inlier [m] |
+| `ransac_n` | `3` | Min points for a RANSAC hypothesis |
+| `min_inlier_ratio` | `0.30` | Minimum inlier fraction to accept the result |
+| `min_points` | `10` | Minimum points needed to attempt RANSAC |
+
+**Topics:**
+
+| Direction | Topic | Type |
+|---|---|---|
+| Subscribe | `/sonoptix/points` | `sensor_msgs/PointCloud2` |
+| Publish | `/sonoptix/perception` | `geometry_msgs/PoseStamped` |
+| Publish | `/sonoptix/perception_valid` | `std_msgs/Bool` |
+
+**Output message format (`/sonoptix/perception`):**
+
+```
+pose.position.x    = orthogonal distance to the net plane [m]
+pose.orientation   = quaternion encoding:
+                       yaw  = atan2(ny, nx)   — horizontal angle of the normal
+                       pitch = asin(nz)        — vertical tilt of the normal
+```
+
+---
+
+### `auto_saver_node` — OctoMap Autosave
+
+**Purpose:** Ensures that the 3D map of the net (generated by `octomap_server`) is not lost if the simulation crashes or closes.
+
+**Algorithm:**
+1. Runs a ROS 2 timer that ticks every 60 seconds.
+2. When triggered, it spawns a system subprocess calling the `octomap_saver_node`.
+3. Intercepts `Ctrl+C` (KeyboardInterrupt) to guarantee a final save before shutting down.
+
+**Save Location:**
+It dynamically detects your workspace and saves the binary tree map directly into the package source folder:
+`~/AUV_project/ros2_AUV/src/auv_perception/net_map_autosave.bt`
+
+*(If the path cannot be resolved, it falls back to `~/net_map_autosave.bt`).*
+
+---
+
+## Maintenance
+
+### Adding Open3D (recommended for performance)
+
+```bash
+pip install open3d
+```
+
+If Open3D is not installed, `sonoptix_perception` automatically falls back to sklearn. Both produce correct results; Open3D is ~5× faster.
+
+### Tuning RANSAC for a different net
+
+If the net produces sparse or noisy point clouds, try:
+- **Increase `ransac_distance_threshold`** (e.g., `0.1` → `0.2`) to accept points further from the plane.
+- **Decrease `min_inlier_ratio`** (e.g., `0.30` → `0.20`) to tolerate more outliers.
+- **Decrease `min_range_m`** if the robot is very close to the net.
+
+### Tuning the Ping360 clustering
+
+If the robot struggles to find the net in `GLOBAL_SEARCH` state:
+- **Decrease `dbscan_eps`** to separate tightly packed clusters more aggressively.
+- **Decrease `dbscan_min_samples`** to detect smaller echoes.
+- Check that the Ping360 bridge is publishing on `/ping360/scan` and the scan range covers the net distance.

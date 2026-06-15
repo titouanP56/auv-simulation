@@ -1,21 +1,12 @@
 # AUV Description
 
-> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+> **Tested on:** ROS 2 **Jazzy** · Gazebo **Harmonic** · Ubuntu 24.04 LTS
 
-## 1. Introduction for Beginners
-
-Welcome to the **AUV Description** package! This package defines the "body" and "senses" of our robot inside the virtual world (Gazebo).
-
-Imagine building a video game character: you need to define its shape, how heavy it is, where its eyes (cameras) and ears (sonars) are located, and how it interacts with water. That is exactly what this package does. It holds the 3D models (meshes), the physical properties (weight, buoyancy), and the sensors (IMU, Sonar, Depth) for the BlueROV2. It also contains the simulated "worlds" (like a pool or the ocean with a fishing net) where the robot will dive.
-
-Additionally, this package provides small helper scripts that take raw, perfect data from the simulation and make it "messy" and realistic, so our robot's brain has to work just as hard in simulation as it would in the real ocean!
+This package defines the **robot body, sensors, and simulation worlds**. It holds the URDF/Xacro model of the BlueROV2, all Gazebo world files, and two helper nodes that make simulation sensor data realistic.
 
 ---
 
-## 2. Quick Start Guide
-
-### Prerequisites
-Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
+## Quick Start
 
 ```bash
 cd ~/AUV_project/ros2_AUV
@@ -23,110 +14,97 @@ colcon build --packages-select AUV_description
 source install/setup.bash
 ```
 
-### Launching the Simulated Environments
+The main mission launch files (`AUV_guidance`) already include everything from this package. The standalone launch files below are mainly useful for development and debugging:
 
-This package contains launch files to spawn the robot in different simulated worlds.
-
-**1. Basic Pool Environment:**
-A simple, empty pool useful for testing basic movements and PID tuning.
 ```bash
+# Empty pool — basic movement tests
 ros2 launch AUV_description bluerov2_bassin.launch.py
-```
 
-**2. Realistic Pool with Sensors:**
-Spawns the robot with all its sensors active (Sonar, IMU, Depth) in the pool.
-```bash
+# Pool with all sensors active
 ros2 launch AUV_description bluerov2_bassin_captors.launch.py
-```
 
-**3. Pool with Waves:**
-Adds surface waves to the pool. Requires `gz-waves` compiled separately (see Note below).
-```bash
-ros2 launch AUV_description bluerov2_bassin_waves.launch.py
-```
-
-**4. Realistic Pool with Sensors (alternate config):**
-Alternate version of the realistic pool launch.
-```bash
-ros2 launch AUV_description bluerov2_realist_bassin.launch.py
-```
-
-**5. Ocean Environment (Net Inspection):**
-Spawns the robot in an open ocean environment featuring a large aquaculture net.
-```bash
+# Open ocean with large aquaculture net
 ros2 launch AUV_description bluerov2_ocean_realistic.launch.py
 ```
 
-> **Note on wave simulation:** The `bluerov2_bassin_waves.launch.py` world requires the `gz-waves` plugin from `asv_wave_sim`. This package is excluded from the default `colcon build` (via `COLCON_IGNORE`) because it requires additional system dependencies (`libcgal-dev`, `libfftw3-dev`) and must be compiled with `GZ_VERSION=harmonic` set. The main net inspection missions do **not** require it.
-
-> **Note on optimize mode:** The launch files in `AUV_guidance` accept an `optimize:=True` flag that dynamically patches the physics step size of the world file before loading it in Gazebo. See the [Performance / Optimize Mode](#5-performance--optimize-mode) section below for details.
+> **Wave simulation** (`bluerov2_bassin_waves.launch.py`) requires `gz-waves` from `asv_wave_sim`, which is excluded from the default `colcon build` via `COLCON_IGNORE`. The main net inspection missions do **not** need it.
 
 ---
 
-## 3. Technical Architecture
+## Key Directories
 
-This package uses standard URDF/Xacro and SDF formats to define the robot and environments for Gazebo Harmonic. It also includes two critical Python nodes to bridge the gap between ideal simulation data and realistic sensor noise.
+| Directory | Contents |
+|---|---|
+| `urdf/` | Xacro/URDF model — robot shape, mass, buoyancy, sensors |
+| `world/` | SDF world files (`small_net.xml`, `ocean_40m.xml`, …) |
+| `meshes/` | 3D visual and collision models (.stl / .dae) |
+| `launch/` | Standalone launch files for individual environments |
+| `config/` | Sensor configuration files |
 
-### Core Nodes
+### Available world files
 
-1. **`simulated_depth_sensor`**: 
-   - **Role**: Simulates a realistic pressure/depth sensor.
-   - **Logic**: Subscribes to the perfect Gazebo odometry, extracts the exact Z coordinate, injects Gaussian noise ($\sigma = 2$ cm), and publishes it.
-   - **Output**: Publishes a `PoseWithCovarianceStamped` where only the Z-axis has a valid covariance matrix entry.
-
-2. **`imu_republisher`**:
-   - **Role**: Fixes Gazebo Harmonic IMU messages.
-   - **Logic**: Gazebo publishes IMU data with zero-filled covariance matrices. An Extended Kalman Filter (EKF) will interpret a zero covariance as "absolute perfection" and fail. This node intercepts the message and injects realistic variance values (derived from URDF noise parameters) into the covariance matrices before republishing.
-
-### Subscribed Topics
-- `/odom` (`nav_msgs/Odometry`): Exact simulation odometry (used by depth sensor).
-- `/imu` (`sensor_msgs/Imu`): Raw, zero-covariance IMU data from Gazebo.
-
-### Published Topics
-- `/depth/pose` (`geometry_msgs/PoseWithCovarianceStamped`): Noisy Z-axis measurement.
-- `/imu/fixed` (`sensor_msgs/Imu`): IMU data with populated covariance matrices for EKF fusion.
-
-### Important Directories
-- `urdf/`: Contains the Xacro/URDF definitions of the BlueROV2.
-- `world/`: Contains the SDF files defining the simulation environments (e.g., `small_net.xml`).
-- `meshes/`: 3D visual and collision models (.stl or .dae).
+| File | Description |
+|---|---|
+| `small_net.xml` | Small aquaculture net (radius ≈ 3.4 m) |
+| `ocean_40m.xml` | Large net (radius ≈ 20 m, 40 m deep) |
+| `bluerov2_bassin.xml` | Empty pool |
+| `Bassin_ntnu_waves.xml` | Pool with waves (needs gz-waves) |
 
 ---
 
-## 4. Maintenance Guide
+## Helper Nodes
 
-If you are a developer taking over this project, here is how you can modify or improve the simulation:
+### `simulated_depth_sensor`
 
-- **Modifying the Robot's Mass/Buoyancy**: Open the URDF/Xacro files in the `urdf/` folder. You can adjust the `<mass>` tags or the buoyancy plugin parameters to make the robot float or sink differently.
-- **Adding New Sensors**: If you need a new camera or DVL, add the corresponding Gazebo sensor plugin block into the URDF. Make sure to bind it to a specific physical link on the robot.
-- **Tuning Sensor Noise**: If the EKF (localization) is struggling, you can adjust the noise variances in `imu_republisher.py` (`ORIENT_VAR`, `ANGVEL_VAR`, `LINACC_VAR`) or the standard deviation in `simulated_depth_sensor.py` to match the specs of your real-world hardware.
-- **Changing the Environment**: Modify the `.xml` files in the `world/` directory. You can add static objects (like rocks or cylinders) to test obstacle avoidance algorithms.
+Simulates a realistic pressure-based depth sensor.
 
----
+- Subscribes to `/odom` (perfect Gazebo odometry).
+- Extracts the Z coordinate and injects Gaussian noise (σ = 2 cm).
+- Publishes `geometry_msgs/PoseWithCovarianceStamped` on `/depth/pose` with a proper Z covariance matrix — as expected by the EKF.
 
-## 5. Performance / Optimize Mode
+### `imu_republisher`
 
-The `AUV_guidance` launch files expose an `optimize` argument that acts on this package's world files at launch time. **No world file is modified on disk** — the patch is applied to a temporary copy.
+Fixes Gazebo Harmonic IMU covariance matrices.
 
-### What changes with `optimize:=True`
+Gazebo publishes IMU data with **all-zero covariance matrices**. The EKF interprets zero covariance as "perfect sensor" and rejects all other inputs. This node intercepts `/imu`, injects realistic variance values (derived from the URDF noise parameters), and republishes on `/imu/fixed`.
 
-| Parameter | Normal mode | Optimize mode |
+| Topic | Type | Direction |
 |---|---|---|
-| Gazebo `max_step_size` | `0.001` s (1 ms) | `0.006` s (6 ms) |
-| URDF sensor update rates | Full rate (via `xacro optimize:=false`) | Reduced rate (via `xacro optimize:=true`) |
-| Yaw EMA filter alpha (`yaw_ema_alpha`) | `1.0` (no smoothing) | `0.15` (smoothed) |
+| `/odom` | `nav_msgs/Odometry` | Subscribe (depth sensor) |
+| `/imu` | `sensor_msgs/Imu` | Subscribe (IMU republisher) |
+| `/depth/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Publish |
+| `/imu/fixed` | `sensor_msgs/Imu` | Publish |
 
-### How it works (world patch)
+---
 
-When `optimize:=True` is passed to a guidance launch file, the launch script:
-1. Reads the selected `.xml` world file from `AUV_description/world/`.
-2. Replaces the `<max_step_size>` value in memory using a regex substitution.
-3. Writes the modified content to a **temporary file** (`/tmp/gz_world_*.xml`).
-4. Passes that temporary file to Gazebo instead of the original.
+## Performance / Optimize Mode
 
-The original world files in `world/` are **never touched**.
+The `AUV_guidance` launch files accept `optimize:=True`, which patches the physics step size of the world file **in memory only** before passing it to Gazebo. The original `.xml` files in `world/` are never modified on disk.
 
-### When to use it
+| Parameter | Normal | Optimized |
+|---|---|---|
+| `max_step_size` | 1 ms | 6 ms |
+| URDF sensor rates | Full rate (e.g. Ping360 10Hz, Sonoptix 15Hz, DVL 15Hz, IMU 50Hz) | Reduced rate (Ping360 1Hz, Sonoptix 2Hz, DVL 5Hz, IMU 25Hz) |
 
-- Use `optimize:=True` on **low-end machines** or when running **headless batch simulations** where real-time physics fidelity is less important than throughput.
-- Keep `optimize:=False` (default) for **final validation runs** or whenever sensor timing accuracy matters.
+Use `optimize:=True` on low-end machines or for headless batch simulations.
+
+---
+
+## URDF Models & Meshes
+
+The `urdf/` directory contains three robot models:
+- `BlueROV2.urdf.xml`: Bare-bones robot (hull + thrusters only).
+- `BlueROV2captors.urdf.xml`: Adds basic sensors (camera, basic IMU/depth).
+- `Bluerov2_realistic.urdf.xml`: **Main model.** Includes all advanced sensors (Ping360, Sonoptix, DVL) and dynamic `optimize` mode toggles.
+
+The `meshes/` directory contains the detailed 3D visual and collision models (.stl / .dae) that give the BlueROV2 and the aquaculture nets their realistic shapes.
+
+---
+
+## Maintenance
+
+- **Change robot mass / buoyancy:** Edit `urdf/Bluerov2_realistic.urdf.xml` — adjust `<mass>` tags or the buoyancy plugin parameters.
+- **Add a sensor:** Add the Gazebo sensor plugin block in the URDF, bound to a physical link. Add a static TF publisher in the launch file to link it to the ROS TF tree.
+- **Tune IMU noise:** Edit `ORIENT_VAR`, `ANGVEL_VAR`, `LINACC_VAR` in `imu_republisher.py` to match your real hardware specs.
+- **Tune depth noise:** Edit the standard deviation in `simulated_depth_sensor.py`.
+- **Add world objects:** Modify the `.xml` files in `world/` — add `<model>` blocks for rocks, cages, or obstacles.

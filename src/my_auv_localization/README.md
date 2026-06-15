@@ -1,77 +1,68 @@
 # AUV Localization
 
-> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+> **Tested on:** ROS 2 **Jazzy** · Gazebo **Harmonic** · Ubuntu 24.04 LTS
 
-## 1. Introduction for Beginners
+This package configures the **Extended Kalman Filter (EKF)** that fuses DVL, IMU, and depth sensor data into a smooth, continuous 6-DOF pose estimate for the guidance nodes.
 
-Welcome to the **AUV Localization** package! This package answers the most important question for any robot: *"Where am I?"*
+Underwater robots cannot use GPS. The EKF combines three complementary sensors to estimate position and orientation without it:
 
-Underwater, GPS doesn't work. To figure out where it is, the robot uses an **Extended Kalman Filter (EKF)**. You can think of the EKF as a very smart detective that constantly gathers clues from different sensors:
-- **The DVL (Doppler Velocity Log)** tells it how fast it's swimming.
-- **The Depth Sensor** tells it how deep it is.
-- **The IMU (Inertial Measurement Unit)** acts like its inner ear, telling it how it's tilting and turning.
-
-By combining all these clues, the EKF creates a smooth, reliable estimate of the robot's exact position and orientation in the water, which the controllers use to navigate.
+| Sensor | What it provides |
+|---|---|
+| **DVL** (`/dvl/velocity_ros`) | Linear velocity (Vx, Vy, Vz) |
+| **IMU** (`/imu/fixed`) | Angular velocity (roll/pitch/yaw rates) |
+| **Depth** (`/depth/pose`) | Absolute Z position |
 
 ---
 
-## 2. Quick Start Guide
-
-### Prerequisites
-Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
+## Quick Start
 
 ```bash
 cd ~/AUV_project/ros2_AUV
 colcon build --packages-select my_auv_localization
 source install/setup.bash
-```
 
-### Running the Localization Filter
-
-This package is usually launched automatically along with the simulation. To run it manually:
-
-```bash
+# Run manually (usually launched automatically with the simulation)
 ros2 launch my_auv_localization localization.launch.py
-```
 
-You can verify the filter is working by looking at the smoothed odometry:
-```bash
+# Verify the EKF output
 ros2 topic echo /odometry/filtered
 ```
 
 ---
 
-## 3. Technical Architecture
+## Configuration (`config/ekf.yaml`)
 
-This package is a configuration wrapper around the standard `robot_localization` ROS 2 package. It configures a 3D Extended Kalman Filter to fuse our specific sensor setup.
+| Parameter | Value |
+|---|---|
+| Filter frequency | 30 Hz |
+| 3D mode | Enabled (`two_d_mode: false`) |
+| World frame | `odom` |
+| Body frame | `base_link` |
 
-### Sensor Fusion Setup (`config/ekf.yaml`)
+**Sensor configuration:**
 
-- **Filter Frequency**: 30 Hz
-- **3D Mode**: Enabled (`two_d_mode: false`)
-- **World Frame**: `odom`
-- **Base Frame**: `base_link`
-
-**Inputs:**
-1. **IMU** (`/imu/fixed`): Only angular velocities (roll/pitch/yaw rates) are fused. Absolute orientation is disabled to avoid initial heading offset issues in the simulator.
-2. **DVL** (`/dvl/velocity_ros`): Linear velocities ($V_x, V_y, V_z$) are fused in the robot body frame (`twist_body: true`).
-3. **Depth** (`/depth/pose`): Only the absolute $Z$ position is fused, anchoring the robot vertically.
-
-### Subscribed Topics
-- `/imu/fixed` (`sensor_msgs/Imu`): Cleaned IMU data.
-- `/dvl/velocity_ros` (`geometry_msgs/TwistWithCovarianceStamped`): Cleaned DVL data.
-- `/depth/pose` (`geometry_msgs/PoseWithCovarianceStamped`): Simulated depth sensor data.
-
-### Published Topics
-- `/odometry/filtered` (`nav_msgs/Odometry`): Smooth, continuous 6-DOF pose estimate.
-- `/tf`: Broadcasts the dynamic transform from `odom` → `base_link`.
+- **IMU** (`/imu/fixed`): Only angular velocities (roll/pitch/yaw rates) are fused. Absolute orientation is disabled to avoid heading offset issues in simulation.
+- **DVL** (`/dvl/velocity_ros`): Linear velocities (Vx, Vy, Vz) fused in the body frame (`twist_body: true`).
+- **Depth** (`/depth/pose`): Only Z position is fused, anchoring depth vertically.
 
 ---
 
-## 4. Maintenance Guide
+## Topics
 
-If you are a developer tuning the robot's localization:
+| Direction | Topic | Type | Purpose |
+|---|---|---|---|
+| Subscribe | `/imu/fixed` | `sensor_msgs/Imu` | Cleaned IMU data |
+| Subscribe | `/dvl/velocity_ros` | `geometry_msgs/TwistWithCovarianceStamped` | DVL velocity |
+| Subscribe | `/depth/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Depth measurement |
+| Publish | `/odometry/filtered` | `nav_msgs/Odometry` | Fused 6-DOF pose estimate |
+| Publish | `/tf` | TF2 | `odom` → `base_link` transform |
 
-- **Tuning the EKF**: Open `config/ekf.yaml`. The matrices (`process_noise_covariance`, `initial_estimate_covariance`) define how much the filter trusts its own mathematical model vs. the sensors. If the robot "jumps" around, you might need to adjust the sensor covariances in the bridge nodes.
-- **Adding a Sensor**: If you add a new sensor (like an underwater USBL or visual odometry), add a new block to `ekf.yaml` (e.g., `pose1: /usbl/pose`) and define which of the 15 variables (x, y, z, roll, pitch, yaw, etc.) the filter should ingest from that sensor by modifying the `[false, false, ...]` boolean array.
-- **Simulation Time**: The launch file defaults to `use_sim_time: true`. If you run this on real hardware, ensure this is set to `false`.
+---
+
+## Maintenance
+
+- **Tune the EKF:** Edit `config/ekf.yaml`. The `process_noise_covariance` matrix controls how much the filter trusts its own motion model vs. the sensors. If the robot "jumps" in position, increase sensor covariance in the bridge nodes (`dvl_bridge_node.cpp`, `simulated_depth_sensor.py`, `imu_republisher.py`).
+
+- **Add a new sensor:** Add a block to `ekf.yaml` (e.g., `pose1: /usbl/pose`) and set the 15-element boolean array to select which state variables that sensor provides (x, y, z, roll, pitch, yaw, Vx, Vy, Vz, …).
+
+- **Real hardware:** The launch file uses `use_sim_time: true` by default. Set it to `false` when running on the real BlueROV2 to use the system clock.

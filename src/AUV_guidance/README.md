@@ -1,142 +1,230 @@
 # AUV Guidance
 
-> **Tested environment:** ROS 2 **Jazzy** + Gazebo **Harmonic** on Ubuntu 24.04 LTS.
+> **Tested on:** ROS 2 **Jazzy** · Gazebo **Harmonic** · Ubuntu 24.04 LTS
 
-## 1. Introduction for Beginners
-
-Welcome to the **AUV Guidance** package! Think of this package as the "brain" of the underwater robot (AUV). 
-
-While the controller moves the muscles (propellers), the guidance package decides **where** the robot should go and **what** it should look at. During a mission, this package tells the robot to dive, find the net with its sonars, approach it safely, and then orbit around it to perform an inspection. 
-
-This package also contains important "bridges." Since a simulated robot and a real-world robot don't always speak the exact same language, these bridges translate the brain's desired movements (like "push forward with 10 Newtons of force") into the specific commands required by either the Gazebo simulator or the real BlueROV2 hardware.
+This package is the **mission brain** of the AUV. It contains the full autonomous inspection state machine (Phase 2 + Phase 3) and the thruster bridges that translate wrench commands into motor signals.
 
 ---
 
-## 2. Quick Start Guide
-
-### Prerequisites
-Make sure ROS 2 Jazzy is installed and your workspace is built. See the [root README installation guide](../../README.md#2-system-requirements--installation) if this is your first time.
+## Quick Start
 
 ```bash
 cd ~/AUV_project/ros2_AUV
 colcon build --packages-select AUV_guidance
 source install/setup.bash
-```
 
-### Running the Mission
-
-The full inspection mission is typically launched via a master launch file, which starts the simulation, controllers, and guidance nodes in the correct sequence.
-
-**Simulated Full Inspection:**
-To launch the complete, automated net inspection mission in simulation:
-```bash
+# Full autonomous mission — small net (default)
 ros2 launch AUV_guidance net_full_inspection.launch.py
+
+# Full autonomous mission — large net (ocean_40m.xml)
+ros2 launch AUV_guidance net_inspection_big_net.launch.py
 ```
 
-**Available Launch Arguments (Balises):**
-You can customize the mission execution using the following arguments (append `arg:=value` to the command):
+See [Section 3 — Launch Arguments](#3-launch-arguments) for all options.
+
+---
+
+## Package Contents
+
+| Executable | File | Role |
+|---|---|---|
+| `net_approach` | `net_approach.py` | Phase 2: dive → find net → approach → standoff |
+| `phase3_inspection` | `phase3_inspection.py` | Phase 3: orbit small net |
+| `phase3_inspection_big_net` | `phase3_inspection_big_net.py` | Phase 3: orbit large net (different PID gains) |
+| `sim_thruster_bridge` | `sim_thruster_bridge.py` | Wrench → 8× Float64 thruster commands (Gazebo) |
+| `bluerov2_bridge` | `bluerov2_bridge.py` | Wrench → MAVROS RC PWM (real BlueROV2) |
+
+---
+
+## 1. Mission Architecture
+
+### Phase 2 — `net_approach` (net_approach.py)
+
+Responsible for getting the robot from its spawn point to a stable 1.5 m standoff in front of the net.
+
+**State machine:**
+
+```
+DESCENDING
+    │ depth stable for 2 s at TARGET_DEPTH
+    ▼
+GLOBAL_SEARCH
+    │ AUV holds position; ping360_nearest performs a full 360° scan
+    │ transitions immediately on /perception/full_scan_ready = True
+    ▼
+ALIGNING
+    │ PD yaw control until facing the net (within 10°)
+    ▼
+APPROACHING
+    │ forward surge + sonoptix_perception distance control
+    ▼
+STABILIZING
+    │ hold standoff for STABILIZE_TIME = 3 s
+    ▼
+STANDOFF  ─── publishes /mission/phase2_done = True
+              broadcasts local_origin TF frame for Phase 3
+```
+
+**Key subscriptions:**
+
+| Topic | Type | Purpose |
+|---|---|---|
+| `/odometry/filtered` | `nav_msgs/Odometry` | Robot pose |
+| `/perception/net_orientation` | `geometry_msgs/PoseStamped` | Net direction (from ping360_nearest) |
+| `/perception/full_scan_ready` | `std_msgs/Bool` | Confirms a full rotation is done |
+| `/sonoptix/perception` | `geometry_msgs/PoseStamped` | Net distance during approach |
+| `/sonoptix/perception_valid` | `std_msgs/Bool` | RANSAC validity gate |
+
+**Key publications:**
+
+| Topic | Type | Purpose |
+|---|---|---|
+| `/auv/command_wrench` | `geometry_msgs/Wrench` | Body forces (Fx, Fz, Mz) |
+| `/mission/phase2_done` | `std_msgs/Bool` | Signals Phase 3 to start |
+| `/mission/local_origin` | `geometry_msgs/PoseStamped` | Origin for Phase 3 relative telemetry |
+
+---
+
+### Phase 3 — `phase3_inspection` / `phase3_inspection_big_net`
+
+Orbits the net perimeter at a fixed standoff distance, descending by `DEPTH_STEP` after each complete lap.
+
+**State machine:**
+
+```
+WAITING
+    │ /mission/phase2_done = True received
+    ▼
+WALKING_THE_NET  ◄──────────────────────────────┐
+    │                                            │
+    │ sonar lost or RANSAC invalid > 2 s         │ sonar recovered
+    ▼                                            │
+LOST_WALL  ─── pulls back + rotates slowly ─────┘
+    │
+    │ accumulated yaw ≥ 2π  →  decrement depth, reset yaw
+    │ depth ≤ FINAL_DEPTH_LIMIT  →
+    ▼
+LAP_COMPLETED  ─── publishes /mission/phase3_done = True
+```
+
+**Four simultaneous PID controllers:**
+
+| DOF | Controller | Set point |
+|---|---|---|
+| Depth (Fz) | PID | `TARGET_DEPTH` (decrements per lap) |
+| Standoff (Fx) | PID | `STANDOFF_DIST` = 1.5 m |
+| Sway velocity (Fy) | PID | 0.25 m/s lateral orbit speed |
+| Yaw (Mz) | PID + EMA | net normal yaw error |
+
+**Cone mode:** When the net is conical (radius decreasing), the node detects the radius shrinking below 90% of `R_ref` and enables a pitch PID controller to follow the angled net surface to the apex.
+
+**Key subscriptions:**
+
+| Topic | Type | Purpose |
+|---|---|---|
+| `/odometry/filtered` | `nav_msgs/Odometry` | Robot pose |
+| `/sonoptix/perception` | `geometry_msgs/PoseStamped` | Net distance + orientation |
+| `/sonoptix/perception_valid` | `std_msgs/Bool` | RANSAC validity |
+| `/mission/phase2_done` | `std_msgs/Bool` | Start trigger |
+
+**Key publications:**
+
+| Topic | Type | Purpose |
+|---|---|---|
+| `/auv/command_wrench` | `geometry_msgs/Wrench` | Body forces (Fx, Fy, Fz, Mz, My) |
+| `/mission/phase3_done` | `std_msgs/Bool` | Mission complete flag |
+| `/phase3/*` | `std_msgs/Float64` | Diagnostic telemetry (all variables) |
+
+---
+
+### Thruster Bridges
+
+**`sim_thruster_bridge`** — Simulation only.
+
+Maps the 6-DOF `Wrench` (Fx, Fy, Fz, Mx, My, Mz) onto 8 individual thruster `Float64` commands using a pseudo-inverse Thruster Allocation Matrix (TAM). Publishes to `/cmd_vel_1` … `/cmd_vel_8`.
+
+**`bluerov2_bridge`** — Real hardware only.
+
+Converts the `Wrench` to MAVROS `OverrideRCIn` (1100–1900 µs PWM) for the 8 thrusters running ArduSub. Active only when `use_hardware:=True`.
+
+---
+
+## 2. Key Tuning Constants
+
+All these constants are defined at the top of their respective files and can be changed without recompiling (they are Python, not ROS parameters). Rebuild and re-source after editing.
+
+**`net_approach.py`:**
+
+| Constant | Default | Effect |
+|---|---|---|
+| `TARGET_DEPTH` | `-2.0` m | Initial dive depth |
+| `STANDOFF_DIST` | `1.5` m | Desired distance from net surface |
+| `KP_YAW / KD_YAW` | `5.0 / 2.0` | Yaw alignment aggressiveness |
+| `KP_SURGE` | `6.0` | Forward approach speed |
+| `GLOBAL_SEARCH_TIMEOUT_SEC` | `60` s | Timeout before emitting a warning |
+
+**`phase3_inspection.py` (small net):**
+
+| Constant | Default | Effect |
+|---|---|---|
+| `ORBIT_DIRECTION` | `+1` | +1 = CCW, -1 = CW orbit |
+| `STANDOFF_DIST` | `1.5` m | Distance from net surface |
+| `DEPTH_STEP` | `0.5` m | Depth decrement per lap |
+| `FINAL_DEPTH_LIMIT` | `-6.0` m | Stop depth |
+| `LOST_WALL_TIMEOUT` | `2.0` s | Sonar silence before LOST_WALL |
+
+**`phase3_inspection_big_net.py` (large net) — same constants but:**
+
+| Constant | Value | Why different |
+|---|---|---|
+| `FINAL_DEPTH_LIMIT` | `-29.5` m | Big net goes 30 m deep |
+| `KP_DEPTH` | `20.0` | Stronger depth hold at depth |
+| `KD_DEPTH` | `20.0` | Damping for depth controller |
+| `KP_DIST` | `12.0` | Faster standoff correction |
+| `KP_VEL_SWAY` | `40.0` | Stronger lateral push |
+| `KP_YAW / MAX_YAW_CMD` | `10.0 / 20.0` | More aggressive yaw on large net |
+
+---
+
+## 3. Launch Arguments
+
+Both launch files accept the same arguments:
 
 | Argument | Default | Description |
 |---|---|---|
-| `headless` | `False` | Run Gazebo in the background without the 3D graphical interface (saves GPU resources). |
-| `use_hardware` | `False` | Set to `True` to deploy on the real BlueROV2. It disables Gazebo and launches MAVROS + `bluerov2_bridge`. |
-| `rviz` | `False` | Launch RViz2 to visualize sensor data, point clouds, and TF trees. |
-| `world_file` | `small_net.xml` | Specify the Gazebo world file to load (located in `AUV_description/world/`). |
-| `gz_delay` | `8.0` | Seconds to wait for Gazebo to initialize before spawning the robot and mission nodes. |
-| `optimize` | `False` | **Performance mode**: coarser physics step (6 ms vs 1 ms), reduced URDF sensor rates, slower control loops (5 Hz vs 20 Hz). Use on low-end machines or for headless batch runs. |
+| `headless` | `False` | Run Gazebo without GUI |
+| `use_hardware` | `False` | Real BlueROV2 (disables Gazebo, starts MAVROS) |
+| `rviz` | `False` | Open RViz2 |
+| `world_file` | see below | World file in `AUV_description/world/` |
+| `gz_delay` | `8.0` | Seconds to wait before spawning nodes |
+| `optimize` | `False` | Performance mode (see below) |
 
-*Example:*
-```bash
-ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True rviz:=True use_hardware:=False
-```
-
-*Performance mode example (low-end machine or CI):*
-```bash
-ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True
-```
-
-**(For developers) Running specific nodes manually:**
-If you need to test the logic phases individually:
-```bash
-ros2 run AUV_guidance phase2_mission     # Starts the approach logic
-ros2 run AUV_guidance phase3_inspection  # Starts the orbiting logic
-```
+| Launch file | Default world |
+|---|---|
+| `net_full_inspection.launch.py` | `small_net.xml` |
+| `net_inspection_big_net.launch.py` | `ocean_40m.xml` |
 
 ---
 
-## 3. Technical Architecture
+## 4. Performance / Optimize Mode
 
-This package orchestrates the high-level mission state machine. It processes sonar point clouds to extract geometric features (wall distance, perpendicular angle, pitch) and computes generalized forces (Wrench) to send to the lower-level thruster bridges.
-
-### Core Nodes
-
-1. **`phase2_mission` (net_approach.py)**: 
-   - **Role**: Handles the dive and initial net approach.
-   - **Logic**: Uses a state machine (`DESCENDING`, `SCANNING`, `ALIGNING`, `APPROACHING`, `STABILIZING`, `STANDOFF`). It uses the Ping360 sonar to find the general direction of the net, aligns to it, and then uses the Sonoptix sonar to approach until exactly 1.5m away. It finally creates a `local_origin` TF frame.
-
-2. **`phase3_inspection` (phase3_inspection.py & phase3_inspection_big_net.py)**:
-   - **Role**: Executes a reactive 360° wall-following orbit around the net.
-   - **Logic**: Uses 4 simultaneous PID controllers (Depth, Distance, Lateral Speed, Yaw). It tracks the net's curvature without relying on a predefined map. It tracks laps by integrating the robot's yaw from odometry. A "LOST_WALL" recovery state is implemented in case the sonar loses track of the net.
-
-3. **`sim_thruster_bridge.py`**:
-   - **Role**: Translates a 6-DOF `Wrench` command into 8 individual `Float64` motor commands (`/cmd_vel_X`) specifically for the Gazebo plugins using a pseudo-inverse Thruster Allocation Matrix.
-
-4. **`bluerov2_bridge.py`**:
-   - **Role**: Translates a 6-DOF `Wrench` command into MAVROS `OverrideRCIn` (RC PWM signals) to control the real BlueROV2 running ArduSub.
-
-### Subscribed Topics
-- `/odometry/filtered` (`nav_msgs/Odometry`): Localization data.
-- `/ping360/scan` (`sensor_msgs/LaserScan`): 2D mechanical scanning sonar.
-- `/sonoptix/points` (`sensor_msgs/PointCloud2`): 3D multibeam imaging sonar.
-- `/auv/command_wrench` (`geometry_msgs/Wrench`): Desired body forces (used by the bridges).
-
-### Published Topics
-- `/auv/command_wrench` (`geometry_msgs/Wrench`): Output of Phase 2 and 3 nodes.
-- `/cmd_vel_[1-8]` (`std_msgs/Float64`): Simulation motor commands (sim_thruster_bridge).
-- `/mavros/rc/override` (`mavros_msgs/OverrideRCIn`): Hardware motor commands (bluerov2_bridge).
-- `/mission/phase` (`std_msgs/String`): Current state of the mission.
-
----
-
-## 4. Maintenance Guide
-
-If you are a developer taking over this project, here is how you can modify or improve the guidance code:
-
-- **Modifying the Inspection Speed**: In `phase3_inspection.py`, find the `target_vy` variable in the `_do_walking` method. It is currently set to `0.25` m/s. Adjust this to make the robot orbit faster or slower.
-- **Adjusting the Standoff Distance**: If the robot is too close or too far from the net, change the `STANDOFF_DIST` constant (currently 1.5m) at the top of the phase scripts.
-- **Improving Wall Recovery**: If the robot frequently loses the net and struggles to find it in `LOST_WALL` state, consider tweaking the `RECOVERY_YAW_CMD` (the speed at which it rotates to search) and `LOST_WALL_TIMEOUT` parameters.
-- **Hardware vs Simulation**: When moving from Gazebo to the real pool, ensure your launch files remap the outputs correctly. You must run `bluerov2_bridge` instead of `sim_thruster_bridge`, and ensure MAVROS is properly configured.
-
----
-
-## 5. Performance / Optimize Mode
-
-Both launch files (`net_full_inspection.launch.py` and `net_inspection_big_net.launch.py`) expose an `optimize` argument that reduces simulation load without changing any source file.
-
-### What changes with `optimize:=True`
-
-| Parameter | Normal mode (`False`) | Optimize mode (`True`) |
+| Parameter | Normal (`False`) | Optimized (`True`) |
 |---|---|---|
-| Gazebo `max_step_size` | `0.001` s (1 ms) | `0.006` s (6 ms) |
-| URDF sensor update rates | Full rate | Reduced rate (via `xacro optimize:=true`) |
-| Mission control loop (`control_rate_hz`) | 20 Hz | 5 Hz |
-| Yaw EMA filter alpha (`yaw_ema_alpha`) | `1.0` (no smoothing) | `0.15` (smoothed) |
+| Gazebo physics step | 1 ms | 6 ms |
+| URDF sensor rates | Full | Reduced |
+| Control loop rate | 20 Hz | 5 Hz |
+| Yaw EMA filter α | 1.0 (raw) | 0.15 (smoothed) |
 
-### Affected launch files
+The world file physics patch is applied in memory only — original files are never modified.
 
-| Launch file | Default world | Target scenario |
+---
+
+## 5. Common Issues
+
+| Symptom | Likely cause | Fix |
 |---|---|---|
-| `net_full_inspection.launch.py` | `small_net.xml` | Small aquaculture net (radius ≈ 3.4 m) |
-| `net_inspection_big_net.launch.py` | `ocean_40m.xml` | Large net (radius ≈ 20 m) |
-
-### How it works
-
-1. **Physics step** — The launch script reads the selected world `.xml`, patches `<max_step_size>` in memory with a regex, and writes the result to a temporary file. The original world files in `AUV_description/world/` are **never modified on disk**.
-2. **URDF sensors** — The `optimize` flag is forwarded to Xacro (`xacro … optimize:=True/False`), which can toggle sensor update rates at model-generation time.
-3. **Control loops** — `control_rate_hz` is set to `5.0` Hz (optimize) vs `20.0` Hz (normal) for both `net_approach` and `phase3_inspection*` nodes.
-4. **Yaw filter** — `yaw_ema_alpha` is set to `0.15` (smoothed) in optimize mode to compensate for the low rate of the sonar.
-
-### When to use it
-
-- **`optimize:=True`** → headless CI/CD runs, low-end laptops, or batch data collection where physics fidelity is secondary.
-- **`optimize:=False`** (default) → final validation, demos, or any run where sensor timing accuracy matters.
+| Robot stuck in `GLOBAL_SEARCH` forever | `ping360_nearest` not running or no scan | Check `ping360_nearest` is in the delayed mission |
+| Robot approaches and immediately turns away | Yaw target wrong by 180° | Check `_spawn_yaw` sign in the launch file |
+| Phase 3 immediately enters `LOST_WALL` | Sonoptix bridge not started | Ensure `sonoptix_perception` is in delayed_mission |
+| Orbit drifts away from net | Standoff PID gains too low | Increase `KP_DIST` in the phase3 file |
+| Robot oscillates yaw rapidly | Yaw EMA alpha too high | Lower `yaw_ema_alpha` (e.g. `0.15`) or increase `KD_YAW` |
