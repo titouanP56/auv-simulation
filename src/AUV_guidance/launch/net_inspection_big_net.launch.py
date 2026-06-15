@@ -1,31 +1,40 @@
 """
-net_full_inspection.launch.py
-==============================
-Full Phase 2 → Phase 3 mission launch.
+net_inspection_big_net.launch.py
+=================================
+Full Phase 2 → Phase 3 mission launch for the BIG NET (ocean_40m.xml).
+
+This file mirrors net_full_inspection.launch.py in its structure and features,
+but targets the large 40-metre net world and adjusts the spawn radius
+accordingly (20 m from the net centre).
 
 What this file does
---------------------
-1. Starts Gazebo Harmonic with small_net.xml   (GUI toggle: headless:=True/False)
-2. Spawns BlueROV2 at a **random point on a circle of radius 2 m** at depth -1 m
-3. Starts all sensor bridges, EKF, TF publishers, DVL, depth-sensor, IMU bridges
-4. Starts ``net_approach``  (Phase 2) after a startup delay
-5. Starts ``phase3_inspection`` (Phase 3) after a slightly longer delay
-   — Phase 3 node waits internally for /mission/phase2_done before acting
-6. Optionally starts RViz2                     (rviz:=True/False)
+-------------------
+1. Starts Gazebo Harmonic with ocean_40m.xml  (GUI toggle: headless:=True/False)
+2. Spawns BlueROV2 at a random point on a circle of radius 20 m at depth -0.5 m,
+   facing the centre (toward the net).
+3. Starts all sensor bridges, EKF, TF publishers, DVL, depth-sensor, IMU bridges.
+4. Starts ``net_approach``                    (Phase 2) after a startup delay.
+5. Starts ``sonoptix_perception``             (processes PointCloud2 → PoseStamped).
+6. Starts ``ping360_nearest``                 (provides initial net orientation).
+7. Starts ``phase3_inspection_big_net``       (Phase 3) at the same time —
+   it waits internally for /mission/phase2_done before acting.
+8. Optionally starts RViz2                    (rviz:=True/False).
 
 Launch arguments
 ----------------
-  headless   False   Set True to run Gazebo without a graphical window
-  rviz       False   Set True to open RViz2 for sensor/TF visualisation
-  world_file small_net.xml   Name of the world file inside AUV_description/world/
-  gz_delay   5.0     Seconds to wait after Gazebo starts before spawning nodes
+  headless    False             Run Gazebo without a graphical window
+  rviz        False             Open RViz2 for sensor/TF visualisation
+  world_file  ocean_40m.xml    Name of the world file inside AUV_description/world/
+  gz_delay    8.0              Seconds after Gazebo starts before spawning nodes
+  use_hardware False            Launch MAVROS + bluerov2_bridge instead of Gazebo
+  optimize    False             Performance mode (coarser physics, slower loops)
 
 Usage
 -----
-  ros2 launch AUV_guidance net_full_inspection.launch.py
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True
-  ros2 launch AUV_guidance net_full_inspection.launch.py rviz:=True
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True rviz:=False
+  ros2 launch AUV_guidance net_inspection_big_net.launch.py
+  ros2 launch AUV_guidance net_inspection_big_net.launch.py headless:=True
+  ros2 launch AUV_guidance net_inspection_big_net.launch.py rviz:=True
+  ros2 launch AUV_guidance net_inspection_big_net.launch.py optimize:=True headless:=True
 """
 
 import math
@@ -59,10 +68,11 @@ PKG_LOC    = get_package_share_directory('my_auv_localization')
 PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 
 
-# ── Random spawn on circle ────────────────────────────────────────────────────
+# ── Spawn: random point on a circle around the net ───────────────────────────
+# The big net is ~40 m across; spawn at 20 m from the centre.
 
-_SPAWN_RADIUS = 20   # [m]  circle radius
-_SPAWN_DEPTH  = -0.5   # [m]  constant depth (negative = underwater in NED-like frame)
+_SPAWN_RADIUS = 20     # [m]  circle radius
+_SPAWN_DEPTH  = -0.5   # [m]  constant depth (slightly below surface)
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)
@@ -72,9 +82,9 @@ _spawn_z = _SPAWN_DEPTH
 _spawn_yaw = _angle  # [rad]  robot faces away from centre → toward net
 
 print(
-    f"[net_full_inspection] Spawn pose: "
-    f"x={_spawn_x:.2f} m  y={_spawn_y:.2f} m  z={_spawn_z:.2f} m  "
-    f"yaw={math.degrees(_spawn_yaw):.1f}°  (angle={math.degrees(_angle):.1f}°)"
+    f'[net_inspection_big_net] Spawn pose: '
+    f'x={_spawn_x:.2f} m  y={_spawn_y:.2f} m  z={_spawn_z:.2f} m  '
+    f'yaw={math.degrees(_spawn_yaw):.1f}°  (angle={math.degrees(_angle):.1f}°)'
 )
 
 
@@ -117,14 +127,16 @@ def generate_launch_description():
     optimize_arg = DeclareLaunchArgument(
         'optimize',
         default_value='False',
-        description='Performance mode: coarser physics step (0.006 vs 0.001), '
-                    'lighter/slower sensors, slower control loops (5 Hz vs 10 Hz). True | False',
+        description=(
+            'Performance mode: coarser physics step (0.006 vs 0.001), '
+            'lighter/slower sensors, slower control loops (5 Hz vs 20 Hz). True | False'
+        ),
     )
 
-    headless    = LaunchConfiguration('headless')
-    rviz        = LaunchConfiguration('rviz')
-    world_file  = LaunchConfiguration('world_file')
-    gz_delay    = LaunchConfiguration('gz_delay')
+    headless     = LaunchConfiguration('headless')
+    rviz         = LaunchConfiguration('rviz')
+    world_file   = LaunchConfiguration('world_file')
+    gz_delay     = LaunchConfiguration('gz_delay')
     use_hardware = LaunchConfiguration('use_hardware')
     optimize     = LaunchConfiguration('optimize')
 
@@ -223,9 +235,9 @@ def generate_launch_description():
     bridge_args.append('/model/BlueROV2/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry')
     bridge_remappings.append(('/model/BlueROV2/odometry', '/odom'))
 
-    # Camera
-    bridge_args.append('/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image')
-    bridge_remappings.append(('/camera/image_raw', '/camera/image_raw'))
+    # Camera (commented out for performance — re-enable if needed)
+    # bridge_args.append('/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image')
+    # bridge_remappings.append(('/camera/image_raw', '/camera/image_raw'))
 
     # Sim clock (essential for use_sim_time)
     bridge_args.append('/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock')
@@ -371,13 +383,20 @@ def generate_launch_description():
     )
 
     # ── Mission nodes (delayed) ───────────────────────────────────────────────
-    # Both nodes are launched together after gz_delay seconds.
-    # - net_approach (Phase 2) starts immediately and runs its state machine.
-    # - phase3_inspection_big_net (Phase 3) starts at the same time but stays WAITING
-    #   until it receives True on /mission/phase2_done — no extra delay needed.
+    # All four nodes start together after gz_delay seconds.
+    # - ping360_nearest     : sweeps sonar → publishes net orientation for Phase 2.
+    # - sonoptix_perception : processes raw PointCloud2 → PoseStamped for Phase 3.
+    # - net_approach        : Phase 2 state machine (runs until standoff reached).
+    # - phase3_inspection_big_net : Phase 3 — waits for /mission/phase2_done.
 
-    control_rate = PythonExpression(["5.0 if '", optimize, "'.lower() in ('true', '1') else 20.0"])
-    yaw_ema_alpha_val = PythonExpression(["1.0 if '", optimize, "'.lower() in ('true', '1') else 0.15"])
+    # Control rate: 5 Hz in optimize mode, 20 Hz otherwise
+    control_rate = PythonExpression(
+        ["5.0 if '", optimize, "'.lower() in ('true', '1') else 20.0"]
+    )
+    # Yaw EMA alpha: 1.0 (no smoothing) in optimize mode, 0.15 otherwise
+    yaw_ema_alpha_val = PythonExpression(
+        ["1.0 if '", optimize, "'.lower() in ('true', '1') else 0.15"]
+    )
 
     ping360_nearest_node = Node(
         package='auv_perception',
@@ -385,6 +404,22 @@ def generate_launch_description():
         name='ping360_nearest',
         output='screen',
         parameters=[{'use_sim_time': True}],
+    )
+
+    sonoptix_perception_node = Node(
+        package='auv_perception',
+        executable='sonoptix_perception',
+        name='sonoptix_perception',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'min_range_m':               0.3,
+            'max_range_m':               7.0,
+            'ransac_distance_threshold': 0.2,
+            'ransac_n':                  3,
+            'min_inlier_ratio':          0.25,
+            'min_points':                10,
+        }],
     )
 
     net_approach_node = Node(
@@ -406,13 +441,18 @@ def generate_launch_description():
         parameters=[{
             'use_sim_time': True,
             'control_rate_hz': ParameterValue(control_rate, value_type=float),
-            'yaw_ema_alpha': ParameterValue(yaw_ema_alpha_val, value_type=float),
+            'yaw_ema_alpha':   ParameterValue(yaw_ema_alpha_val, value_type=float),
         }],
     )
 
     delayed_mission = TimerAction(
         period=gz_delay,
-        actions=[ping360_nearest_node, net_approach_node, phase3_node],
+        actions=[
+            ping360_nearest_node,
+            sonoptix_perception_node,
+            net_approach_node,
+            phase3_node,
+        ],
     )
 
     # ── Assembly ──────────────────────────────────────────────────────────────
@@ -441,11 +481,11 @@ def generate_launch_description():
         imu_republisher,
         sim_thruster_bridge_node,
 
-        # Hardware MAVROS
+        # Hardware MAVROS (conditional on use_hardware)
         mavros_node,
         bluerov2_bridge_node,
 
-        # Localisation
+        # Localisation (EKF)
         robot_localization,
 
         # TF
