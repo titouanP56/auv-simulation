@@ -49,8 +49,13 @@ class SimulatedDepthSensor(Node):
         # In ROS, covariance is a 36-element array (6x6 matrix for x, y, z, roll, pitch, yaw)
         # Indexes along the diagonal are: 0=x, 7=y, 14=z, 21=roll, 28=pitch, 35=yaw.
         # 1e9 means "ignore this axis", 0.0004 means "trust this axis with 0.02m stddev".
-        pose_msg.pose.covariance = [1e9] * 36
+        pose_msg.pose.covariance = [0.0] * 36
+        pose_msg.pose.covariance[0]  = 1e9 # X
+        pose_msg.pose.covariance[7]  = 1e9 # Y
         pose_msg.pose.covariance[14] = 0.0004 # 0.02^2 (variance in Z)
+        pose_msg.pose.covariance[21] = 1e9 # Roll
+        pose_msg.pose.covariance[28] = 1e9 # Pitch
+        pose_msg.pose.covariance[35] = 1e9 # Yaw
         
         self.publisher.publish(pose_msg)
 

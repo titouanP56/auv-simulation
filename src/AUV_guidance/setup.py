@@ -12,6 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
             'launch/net_full_inspection.launch.py',
+            'launch/net_full_inspection_true_auv.launch.py',
             'launch/net_inspection_big_net.launch.py',
             'launch/real_test.launch.py',
         ]),
@@ -31,7 +32,9 @@ setup(
     entry_points={
         'console_scripts': [
             'net_approach = AUV_guidance.net_approach:main',
+            'net_approach_2D_sono = AUV_guidance.net_approach_2D_sono:main',
             'phase3_inspection = AUV_guidance.phase3_inspection:main',
+            'phase3_inspection_2D_sono = AUV_guidance.phase3_inspection_2D_sono:main',
             'phase3_inspection_big_net = AUV_guidance.phase3_inspection_big_net:main',
             'phase3_inspection_current = AUV_guidance.phase3_inspection_current:main',
             'bluerov2_bridge = AUV_guidance.bluerov2_bridge:main',

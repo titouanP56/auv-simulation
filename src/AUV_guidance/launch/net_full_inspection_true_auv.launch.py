@@ -33,8 +33,8 @@ PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 
 # ── Spawn coordinates ────────────────────────────────────────────────────
 
-_SPAWN_RADIUS = 1.5    # [m]  circle radius
-_SPAWN_DEPTH  = -1   # [m]  depth
+_SPAWN_RADIUS = 3.5    # [m]  circle radius
+_SPAWN_DEPTH  = -3   # [m]  depth
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)
@@ -147,7 +147,7 @@ def generate_launch_description():
 
     # ── URDF / robot description ──────────────────────────────────────────────
 
-    urdf_file  = os.path.join(PKG_DESC, 'urdf', 'Bluerov2_realistic.urdf.xml')
+    urdf_file  = os.path.join(PKG_DESC, 'urdf', 'Bluerov2_realistic_2D.urdf.xml')
     xacro_file = Command(['xacro ', urdf_file, ' optimize:=', optimize])
 
     robot_state_publisher = Node(
@@ -206,9 +206,11 @@ def generate_launch_description():
     # Ping360 sonar
     bridge_args.append('/ping360/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan')
     bridge_remappings.append(('/ping360/scan', '/ping360/scan'))
+    bridge_args.append('/ping360/scan/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked')
+    bridge_remappings.append(('/ping360/scan/points', '/ping360/points'))
 
     # Sonoptix Echo (2-D sonar pseudo-3D)
-    bridge_args.append('/sonoptix/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked')
+    bridge_args.append('/sonoptix/points@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan')
     bridge_remappings.append(('/sonoptix/points', '/sonoptix/points'))
 
     # IMU
@@ -348,6 +350,49 @@ def generate_launch_description():
     control_rate = PythonExpression(["5.0 if '", optimize, "'.lower() in ('true', '1') else 20.0"])
     yaw_ema_alpha_val = PythonExpression(["1.0 if '", optimize, "'.lower() in ('true', '1') else 0.15"])
 
+    # ── Sonoptix 2D perception (net distance + yaw) ───────────────────────────
+    # Subscribes to /sonoptix/points (LaserScan via bridge).
+    # Publishes /perception/net_distance, /perception/net_yaw_target,
+    #           /perception/perception_valid
+    sonoptix_2D_perception_node = Node(
+        package='auv_perception',
+        executable='sonoptix_2D_perception',
+        name='sonoptix_2D_perception',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'min_range':                 0.3,
+            'max_range':                 7.0,
+            'ransac_residual_threshold': 0.05,
+            'ransac_min_inliers_ratio':  0.30,
+            'min_points':                10,
+        }],
+    )
+
+    # ── Ping360 circle fitting (cage radius + centre) ─────────────────────────
+    # Subscribes to /ping360/points (PointCloud2 if available) at ~0.5–1 Hz.
+    # Publishes /perception/cage_radius, /perception/cage_center,
+    #           /perception/circle_valid
+    ping360_circle_fitting_node = Node(
+        package='auv_perception',
+        executable='ping360_circle_fitting',
+        name='ping360_circle_fitting',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'min_radius':                5.0,
+            'max_radius':                25.0,
+            'min_dead_zone':             0.5,
+            'ransac_iterations':         1000,
+            'ransac_distance_threshold': 0.3,
+            'min_inlier_ratio':          0.4,
+        }],
+    )
+
+    # ── Ping360 nearest — orientation + full-scan signal for GLOBAL_SEARCH ─────
+    # net_approach_2D_sono uses /perception/net_orientation (PoseStamped) and
+    # /perception/full_scan_ready (Bool) from this node to align toward the net
+    # during the GLOBAL_SEARCH phase before the Sonoptix takes over.
     ping360_nearest_node = Node(
         package='auv_perception',
         executable='ping360_nearest',
@@ -356,25 +401,14 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
     )
 
-    sonoptix_perception_node = Node(
-        package='auv_perception',
-        executable='sonoptix_perception',
-        name='sonoptix_perception',
-        output='screen',
-        parameters=[{
-            'use_sim_time': True,
-            'min_range_m':              0.3,
-            'max_range_m':              7.0,
-            'ransac_distance_threshold': 0.2,
-            'ransac_n':                 3,
-            'min_inlier_ratio':         0.25,
-            'min_points':               10,
-        }],
-    )
-
+    # ── Phase 2 — Net approach (2D Sonoptix variant) ──────────────────────────
+    # GLOBAL_SEARCH : /perception/net_orientation + /perception/full_scan_ready
+    #                 → provided by ping360_nearest (Ping360 LaserScan)
+    # APPROACHING   : /perception/net_distance (Float32)
+    #                 → provided by sonoptix_2D_perception
     net_approach_node = Node(
         package='AUV_guidance',
-        executable='net_approach',
+        executable='net_approach_2D_sono',
         name='net_approach',
         output='screen',
         parameters=[{
@@ -383,23 +417,27 @@ def generate_launch_description():
         }],
     )
 
+    # ── Phase 3 — Inspection orbit (2D Sonoptix + Ping360 pitch) ─────────────
+    # Subscribes to /perception/net_distance, /perception/net_yaw_target,
+    #               /perception/perception_valid, /perception/cage_radius.
     phase3_node = Node(
         package='AUV_guidance',
-        executable='phase3_inspection',
+        executable='phase3_inspection_2D_sono',
         name='phase3_inspection',
         output='screen',
         parameters=[{
             'use_sim_time': True,
             'control_rate_hz': ParameterValue(control_rate, value_type=float),
-            'yaw_ema_alpha': ParameterValue(yaw_ema_alpha_val, value_type=float),
+            'yaw_ema_alpha':   ParameterValue(yaw_ema_alpha_val, value_type=float),
         }],
     )
 
     delayed_mission = TimerAction(
         period=gz_delay,
         actions=[
-            ping360_nearest_node,
-            sonoptix_perception_node,
+            ping360_nearest_node,           # Phase 2 GLOBAL_SEARCH orientation
+            sonoptix_2D_perception_node,    # Phase 2 approach distance + Phase 3 orbit
+            ping360_circle_fitting_node,    # Phase 3 cage geometry (radius → pitch)
             net_approach_node,
             phase3_node,
         ],

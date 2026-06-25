@@ -1,0 +1,384 @@
+<?xml version="1.0"?>
+<robot name="BlueROV2" xmlns:xacro="http://www.ros.org/wiki/xacro" xmlns:gz="http://gazebosim.org/schema">
+
+    <!-- ── Performance profile (set via launch arg optimize:=true/false) ── -->
+    <xacro:arg name="optimize" default="false"/>
+
+    <xacro:property name="ping360_samples" value="360"/>
+    <xacro:property name="ping360_rate" value="10"/> <!-- Hz en mode normal (optimize=false) -->
+
+    <xacro:property name="sonoptix_h_samples" value="64"/>
+    <xacro:property name="sonoptix_v_samples" value="20"/>
+    <xacro:property name="sonoptix_rate" value="15"/> <!-- Hz en mode normal (optimize=false) -->
+
+    <xacro:property name="dvl_rate" value="15"/> <!-- Hz en mode normal (optimize=false) -->
+    <xacro:property name="imu_rate" value="50"/> <!-- Hz en mode normal (optimize=false) -->
+
+    <xacro:if value="$(arg optimize)">
+        <xacro:property name="ping360_samples" value="90"/>
+        <xacro:property name="ping360_rate" value="1"/> <!-- Hz en mode optimize -->
+
+        <xacro:property name="sonoptix_h_samples" value="16"/>
+        <xacro:property name="sonoptix_v_samples" value="5"/>
+        <xacro:property name="sonoptix_rate" value="2"/> <!-- Hz en mode optimize -->
+
+        <xacro:property name="dvl_rate" value="5"/> <!-- Hz en mode optimize -->
+        <xacro:property name="imu_rate" value="25"/> <!-- Hz en mode optimize -->
+    </xacro:if>
+
+    <xacro:property name="body_length" value="0.46" />
+    <xacro:property name="body_width" value="0.38" />
+    <xacro:property name="body_height" value="0.245" />
+
+    <xacro:property name="mass" value="12.5"/> 
+
+    <xacro:property name="collision_height" value="0.085" />
+
+    <xacro:macro name="hybrid_inertia">
+        <inertial>
+            <mass value="${mass}" />
+            <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+            <inertia ixx="0.5" ixy="0" ixz="0"
+                     iyy="0.57" iyz="0"
+                     izz="0.37" />
+        </inertial>
+    </xacro:macro>
+
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 -0.0225" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://AUV_description/meshes/bluerov2/bluerov2_heavy.dae" scale="1 1 1"/>
+            </geometry>
+        </visual>
+        
+        <collision>
+            <origin xyz="0 0 0.10" rpy="0 0 0"/>
+            <geometry>
+                <box size="${body_length} ${body_width} ${collision_height}"/>
+            </geometry>
+        </collision>
+        
+        <xacro:hybrid_inertia/>
+    </link>
+
+    <xacro:macro name="add_thruster" params="prefix x y z rpy axis_xyz thrust_coeff">
+        <link name="${prefix}_propeller">
+            <visual>
+                <geometry>
+                    <cylinder radius="0.04" length="0.02"/>
+                </geometry>
+                <material name="black">
+                    <color rgba="0 0 0 1"/>
+                </material>
+            </visual>
+            <inertial>
+                <mass value="0.2"/> 
+                <inertia ixx="0.0001" ixy="0" ixz="0" 
+                         iyy="0.0001" iyz="0" 
+                         izz="0.0001"/>
+            </inertial>
+        </link>
+
+        <joint name="${prefix}_joint" type="continuous">
+            <parent link="base_link"/>
+            <child link="${prefix}_propeller"/>
+            <origin xyz="${x} ${y} ${z}" rpy="${rpy}"/>
+            <axis xyz="${axis_xyz}"/>
+            <dynamics damping="0.0" friction="0.0"/>
+            <limit effort="100" velocity="500"/>
+        </joint>
+
+        <gazebo>
+            <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+                <joint_name>${prefix}_joint</joint_name>
+                <thrust_coefficient>${thrust_coeff}</thrust_coefficient>
+                <fluid_density>997</fluid_density>
+                <propeller_diameter>0.076</propeller_diameter>
+                <max_thrust_cmd>50</max_thrust_cmd>
+                <velocity_control>true</velocity_control>
+            </plugin>
+        </gazebo>
+        <gazebo reference="${prefix}_propeller">
+            <material>Gazebo/Black</material>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:add_thruster prefix="thruster_1" x="0.14" y="-0.1" z="0" rpy="0 -1.5708 0.7854" axis_xyz="0 0 1" thrust_coeff="-0.002"/>
+    <xacro:add_thruster prefix="thruster_2" x="0.14" y="0.1" z="0" rpy="0 1.5708 -0.7854" axis_xyz="0 0 1" thrust_coeff="0.002"/>
+    <xacro:add_thruster prefix="thruster_3" x="-0.14" y="-0.1" z="0" rpy="0 1.5708 2.3562" axis_xyz="0 0 1" thrust_coeff="0.002"/>
+    <xacro:add_thruster prefix="thruster_4" x="-0.14" y="0.1" z="0" rpy="0 -1.5708 -2.3562" axis_xyz="0 0 1" thrust_coeff="-0.002"/>
+
+    <xacro:add_thruster prefix="thruster_5" x="0.12" y="-0.218" z="0.07" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="-0.002"/>
+    <xacro:add_thruster prefix="thruster_6" x="0.12" y="0.218" z="0.07" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="0.002"/>
+    <xacro:add_thruster prefix="thruster_7" x="-0.12" y="-0.218" z="0.07" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="0.002"/>   
+    <xacro:add_thruster prefix="thruster_8" x="-0.12" y="0.218" z="0.07" rpy="0 0 0" axis_xyz="0 0 1" thrust_coeff="-0.002"/>
+    
+    
+    <link name="camera_link">
+        <visual>
+            <geometry><box size="0.02 0.05 0.05"/></geometry>
+            <material name="blue">
+                <color rgba="0 0 1 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="camera_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0.22 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="camera_link">
+        <material>Gazebo/Blue</material>
+        <!-- <sensor name="camera" type="camera">
+            <camera>
+                <horizontal_fov>1.047</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                </image>
+            </camera>
+            <always_on>1</always_on>
+            <update_rate>30</update_rate>
+            <topic>camera/image_raw</topic>
+        </sensor> -->
+    </gazebo>
+
+    <link name="ping360_link">
+        <visual>
+            <geometry>
+                <cylinder radius="0.04" length="0.06"/>
+            </geometry>
+            <material name="red">
+                <color rgba="1 0 0 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.1"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="ping360_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="ping360_link"/>
+        <origin xyz="0.0 0.0 0.15" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="ping360_link">
+        <material>Gazebo/Red</material>
+        <sensor name="ping360_sonar" type="gpu_lidar">
+            <visualize>false</visualize>
+            <update_rate>${ping360_rate}</update_rate>
+            <topic>ping360/scan</topic>
+            <gz:frame_id>ping360_link</gz:frame_id>
+            <lidar>
+                <scan>
+                    <horizontal>
+                        <samples>${ping360_samples}</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-3.14159</min_angle>
+                        <max_angle>3.14159</max_angle>
+                    </horizontal>
+                    <vertical>
+                        <samples>1</samples> 
+                        <resolution>1</resolution>
+                        <min_angle>0</min_angle>
+                        <max_angle>0</max_angle>
+                    </vertical>
+                </scan>
+                <range>
+                    <min>0.75</min> 
+                    <max>15.0</max>
+                    <resolution>0.01</resolution>
+                </range>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.02</stddev> 
+                </noise>
+            </lidar>
+            <always_on>1</always_on>
+            <visualize>false</visualize> 
+        </sensor>
+    </gazebo>
+
+    <link name="imu_link">
+        <visual>
+            <geometry>
+                <box size="0.02 0.02 0.02"/>
+            </geometry>
+            <material name="orange">
+                <color rgba="1 0.5 0 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="imu_link">
+        <material>Gazebo/Orange</material>
+        <sensor name="imu_sensor" type="imu">
+            <always_on>1</always_on>
+            <update_rate>${imu_rate}</update_rate>
+            <topic>imu</topic>
+            <gz:frame_id>imu_link</gz:frame_id>
+            <imu>
+                <angular_velocity>
+                    <x><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev><bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev></noise></x>
+                    <y><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev><bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev></noise></y>
+                    <z><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev><bias_mean>0.0000075</bias_mean><bias_stddev>0.0000008</bias_stddev></noise></z>
+                </angular_velocity>
+                <linear_acceleration>
+                    <x><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev><bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev></noise></x>
+                    <y><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev><bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev></noise></y>
+                    <z><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev><bias_mean>0.02</bias_mean><bias_stddev>0.001</bias_stddev></noise></z>
+                </linear_acceleration>
+            </imu>
+        </sensor>
+    </gazebo>
+
+    <link name="sonoptix_link">
+        <visual>
+            <geometry>
+                <box size="0.08 0.08 0.06"/>
+            </geometry>
+            <material name="green">
+                <color rgba="0 1 0 1"/>
+            </material>
+        </visual>
+        <inertial>
+            <mass value="0.2"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+        </inertial>
+    </link>
+    <joint name="sonoptix_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="sonoptix_link"/>
+        <origin xyz="0.25 0.0 0.05" rpy="0 0.087266 0"/> 
+    </joint>
+
+    <gazebo reference="sonoptix_link">
+        <material>Gazebo/Green</material>
+        <sensor name="sonoptix_sonar" type="gpu_lidar">
+            <visualize>true</visualize>
+            <update_rate>25</update_rate>
+            <topic>sonoptix/points</topic>
+            <gz:frame_id>sonoptix_link</gz:frame_id>
+            <lidar>
+                <scan>
+                    <horizontal>
+                        <samples>256</samples>
+                        <resolution>1</resolution>
+                        <min_angle>-1.047</min_angle> 
+                        <max_angle>1.047</max_angle>  
+                    </horizontal>
+                    <vertical>
+                        <samples>1</samples>
+                        <resolution>1</resolution>
+                        <min_angle>0.0</min_angle>
+                        <max_angle>0.0</max_angle>
+                    </vertical>
+                </scan>
+                <range>
+                    <min>0.3</min> 
+                    <max>15.0</max>
+                    <resolution>0.008</resolution>
+                </range>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.03</stddev> 
+                </noise>
+            </lidar>
+            <always_on>1</always_on>
+            <visualize>true</visualize>
+        </sensor>
+    </gazebo>
+
+    <gazebo reference="base_link">
+        <sensor name="dvl_sensor" type="custom" gz:type="dvl">
+
+            <pose>0 0 -0.15 0 0 0</pose>
+
+            <always_on>1</always_on>
+            <update_rate>${dvl_rate}</update_rate>
+            <topic>dvl/velocity</topic>
+            <gz:frame_id>base_link</gz:frame_id>
+            <gz:dvl>
+                <type>phased_array</type>
+                <arrangement degrees="true">
+                    <beam id="1"><aperture>2.0</aperture><rotation>45</rotation><tilt>22.5</tilt></beam>
+                    <beam id="2"><aperture>2.0</aperture><rotation>135</rotation><tilt>22.5</tilt></beam>
+                    <beam id="3"><aperture>2.0</aperture><rotation>225</rotation><tilt>22.5</tilt></beam>
+                    <beam id="4"><aperture>2.0</aperture><rotation>315</rotation><tilt>22.5</tilt></beam>
+                </arrangement>
+                <tracking>
+                    <bottom_mode>
+                        <when>best</when>
+                        <noise type="gaussian"><stddev>0.01</stddev></noise>
+                        <visualize>true</visualize>
+                    </bottom_mode>
+                </tracking>
+            </gz:dvl>
+        </sensor>
+    </gazebo>
+
+    <gazebo>
+        <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+            <link_name>base_link</link_name>
+            <water_density>997</water_density>
+
+            <center_of_buoyancy>0 0 0.1</center_of_buoyancy>
+            
+            <xDotU>6.36</xDotU>
+            <yDotV>7.12</yDotV>
+            <zDotW>12.0</zDotW>
+            <kDotP>0.15</kDotP>
+            <mDotQ>0.14</mDotQ>
+            <nDotR>0.15</nDotR>
+            
+            <xU>-4.03</xU>
+            <yV>-6.22</yV>
+            <zW>-5.18</zW>
+            <kP>-0.07</kP>
+            <mQ>-0.07</mQ>
+            <nR>-0.07</nR>
+            
+            <xUabsU>-18.18</xUabsU>
+            <yVabsV>-21.66</yVabsV>
+            <zWabsW>-39.99</zWabsW>
+            <kPabsP>-1.55</kPabsP>
+            <mQabsQ>-1.55</mQabsQ>
+            <nRabsR>-1.55</nRabsR>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+            <odom_frame>odom</odom_frame>
+            <robot_base_frame>base_link</robot_base_frame>
+            <dimensions>3</dimensions>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+    </gazebo>
+
+</robot>

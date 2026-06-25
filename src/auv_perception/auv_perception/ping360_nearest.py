@@ -68,9 +68,10 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 # ── Messages & TF2 ────────────────────────────────────────────────────────────
-from geometry_msgs.msg import PoseStamped, PointStamped
+from geometry_msgs.msg import Point, PoseStamped, PointStamped
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool
+from visualization_msgs.msg import Marker
 import tf2_ros
 import tf2_geometry_msgs  # noqa: F401 — registers PointStamped with tf2
 
@@ -279,6 +280,23 @@ class Ping360NearestNode(Node):
         self._ready_pub = self.create_publisher(
             Bool,
             self._ready_topic,
+            10,
+        )
+
+        # ── Debug visualisation publishers (RViz / Foxglove) ──────────────────
+        self._debug_cluster_pub = self.create_publisher(
+            Marker,
+            "~/debug/net_cluster",
+            10,
+        )
+        self._debug_curve_pub = self.create_publisher(
+            Marker,
+            "~/debug/ransac_curve",
+            10,
+        )
+        self._debug_raw_pub = self.create_publisher(
+            Marker,
+            "~/debug/raw_points",
             10,
         )
 
@@ -512,6 +530,9 @@ class Ping360NearestNode(Node):
         # coeffs = [a, b, c] in regression space (possibly axis-swapped)
         # inlier_pts is in the same space (for _poly2_closest_point)
 
+        # ── Debug markers (non-blocking, best-effort) ──────────────────────────
+        self._publish_debug_markers(pts, inlier_pts, coeffs, swap_axes, ros_stamp)
+
         # ── 4. Closest point + normal ──────────────────────────────────────────
         # Find the point on the fitted curve closest to the cluster centroid
         # (best approximation of "closest to AUV" in the current odom frame).
@@ -570,6 +591,129 @@ class Ping360NearestNode(Node):
             f"({len(inlier_pts)/len(net_pts):.0%})  "
             f"buffer={len(pts)} pts"
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Debug visualisation
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _publish_debug_markers(
+        self,
+        raw_pts: np.ndarray,
+        inlier_pts: np.ndarray,
+        coeffs: np.ndarray,
+        swap_axes: bool,
+        stamp,
+    ) -> None:
+        """
+        Publish three RViz / Foxglove visualisation markers:
+          - Marker 0 (POINTS, green)     : RANSAC inlier points in the odom frame.
+          - Marker 1 (LINE_STRIP, red)   : Sampled polynomial curve over the inliers.
+          - Marker 2 (POINTS, blue-grey) : Full pre-DBSCAN point cloud (raw buffer).
+
+        These markers are purely cosmetic and do not affect any algorithmic output.
+
+        Args:
+            raw_pts    : (N, 2) array of ALL accumulated points before DBSCAN,
+                         already in the odom frame — no axis swap needed.
+            inlier_pts : (M, 2) array of RANSAC inlier points in *regression space*
+                         (axes may be swapped vs. odom frame — see swap_axes).
+            coeffs     : [a, b, c] polynomial coefficients in regression space.
+            swap_axes  : True if X/Y were swapped before regression.
+                         When True the regression X axis corresponds to odom Y,
+                         and vice-versa; we restore the physical frame here.
+            stamp      : ROS builtin_interfaces/Time stamp for the marker headers.
+        """
+        # ── Marker 1 — RANSAC inlier points (green POINTS) ────────────────────
+        m_pts = Marker()
+        m_pts.header.frame_id  = self._target_frame
+        m_pts.header.stamp     = stamp
+        m_pts.ns               = "ransac_inliers"
+        m_pts.id               = 0
+        m_pts.type             = Marker.POINTS
+        m_pts.action           = Marker.ADD
+        m_pts.scale.x          = 0.05   # point width  [m]
+        m_pts.scale.y          = 0.05   # point height [m]
+        m_pts.scale.z          = 0.05
+        m_pts.color.r          = 0.0
+        m_pts.color.g          = 1.0
+        m_pts.color.b          = 0.0
+        m_pts.color.a          = 1.0    # fully opaque
+
+        for row in inlier_pts:
+            p = Point()
+            if swap_axes:
+                # Regression was done with axes swapped: col-0 = odom-Y, col-1 = odom-X
+                p.x = float(row[1])
+                p.y = float(row[0])
+            else:
+                p.x = float(row[0])
+                p.y = float(row[1])
+            p.z = 0.0
+            m_pts.points.append(p)
+
+        self._debug_cluster_pub.publish(m_pts)
+
+        # ── Marker 2 — Polynomial curve (red LINE_STRIP) ──────────────────────
+        m_curve = Marker()
+        m_curve.header.frame_id = self._target_frame
+        m_curve.header.stamp    = stamp
+        m_curve.ns              = "ransac_curve"
+        m_curve.id              = 1
+        m_curve.type            = Marker.LINE_STRIP
+        m_curve.action          = Marker.ADD
+        m_curve.scale.x         = 0.02   # line width [m]
+        m_curve.scale.y         = 0.0
+        m_curve.scale.z         = 0.0
+        m_curve.color.r         = 1.0
+        m_curve.color.g         = 0.0
+        m_curve.color.b         = 0.0
+        m_curve.color.a         = 1.0    # fully opaque
+
+        # Sample 50 points along the regression-space X axis
+        x_min = float(inlier_pts[:, 0].min())
+        x_max = float(inlier_pts[:, 0].max())
+        x_samples = np.linspace(x_min, x_max, 50)
+        y_samples  = np.polyval(coeffs, x_samples)
+
+        for xi, yi in zip(x_samples, y_samples):
+            p = Point()
+            if swap_axes:
+                # Same axis restoration as above
+                p.x = float(yi)
+                p.y = float(xi)
+            else:
+                p.x = float(xi)
+                p.y = float(yi)
+            p.z = 0.0
+            m_curve.points.append(p)
+
+        self._debug_curve_pub.publish(m_curve)
+
+        # ── Marker 2 — Raw pre-DBSCAN point cloud (blue-grey POINTS) ──────────────
+        m_raw = Marker()
+        m_raw.header.frame_id = self._target_frame
+        m_raw.header.stamp    = stamp
+        m_raw.ns              = "raw_points"
+        m_raw.id              = 2
+        m_raw.type            = Marker.POINTS
+        m_raw.action          = Marker.ADD
+        m_raw.scale.x         = 0.02   # smaller than inliers to stay in background
+        m_raw.scale.y         = 0.02
+        m_raw.scale.z         = 0.02
+        m_raw.color.r         = 0.5
+        m_raw.color.g         = 0.5
+        m_raw.color.b         = 0.8
+        m_raw.color.a         = 0.6    # semi-transparent
+
+        # raw_pts is already in the odom frame (no swap_axes needed)
+        for i in range(len(raw_pts)):
+            p = Point()
+            p.x = float(raw_pts[i, 0])
+            p.y = float(raw_pts[i, 1])
+            p.z = 0.0
+            m_raw.points.append(p)
+
+        self._debug_raw_pub.publish(m_raw)
 
     # ──────────────────────────────────────────────────────────────────────────
     # DBSCAN

@@ -22,7 +22,7 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_auv_description = get_package_share_directory('AUV_description')
 
-    sdf_file = os.path.join(pkg_auv_description, 'world', 'Bassin_ntnu.xml')
+    sdf_file = os.path.join(pkg_auv_description, 'world', 'small_net.xml')
     urdf_file = os.path.join(pkg_auv_description, 'urdf', 'Bluerov2_realistic_2D.urdf.xml')
 
     # Parse Xacro/URDF file into an XML string

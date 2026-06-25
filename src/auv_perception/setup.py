@@ -36,6 +36,9 @@ setup(
             'ping360_mapper_node = auv_perception.ping360_mapper_node:main',
             'ping360_nearest = auv_perception.ping360_nearest:main',
             'sonoptix_perception = auv_perception.sonoptix_perception:main',
+            'sonoptix_2D_perception = auv_perception.sonoptix_2D_perception:main',
+            'ping360_bridge_player = auv_perception.ping360_bridge_player:main',
+            'ping360_circle_fitting = auv_perception.ping360_circle_fitting:main',
         ],
     },
 )
