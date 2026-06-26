@@ -2,8 +2,30 @@
 """
 net_approach_2d.py
 ==================
-ROS 2 guidance node for Phase 2 of the AUV mission: approach to the
-aquaculture net (Adapted for 2D Sonoptix + Polynomial RANSAC).
+
+ROS 2 guidance node for the AUV's Phase 2 mission: autonomous approach to an
+aquaculture net. 
+
+This node utilizes a 2D Sonoptix sonar and Polynomial RANSAC detection logic 
+to navigate the AUV relative to net structures.
+
+State Machine:
+    - DESCENDING: Maintain target depth until stable.
+    - GLOBAL_SEARCH: Await net orientation detection from perception.
+    - ALIGNING: Yaw to match the detected orientation of the net.
+    - APPROACHING: Surge forward while maintaining orientation and depth.
+    - STABILIZING: Hold position upon reaching proximity.
+    - STANDOFF: Maintain final distance from the net.
+
+Sensor Sources & Topics:
+    - Inputs: /odometry/filtered (Nav), /perception/net_orientation (Pose),
+              /perception/net_distance (Float32), /perception/perception_valid (Bool).
+    - Outputs: /auv/command_wrench (Wrench), /mission/phase (String).
+
+Key Parameters:
+    - Control gains: KP_DEPTH, KP_YAW, KD_YAW, KP_SURGE.
+    - Tolerance thresholds: DEPTH_TOLERANCE, YAW_TOLERANCE, APPROACH_TOL.
+    - Time constants: STABILIZE_TIME, DEPTH_HOLD_TIME, YAW_HOLD_TIME.
 """
 
 import math
@@ -18,7 +40,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped, PoseStamped, Wrench
 from tf2_ros import TransformBroadcaster
 
-TARGET_DEPTH      = -3.0    
+TARGET_DEPTH      = -2.0    
 DEPTH_TOLERANCE   = 0.2     
 DEPTH_HOLD_TIME   = 2.0     
 YAW_TOLERANCE     = math.radians(10.0)   

@@ -34,7 +34,7 @@ PKG_GZ_SIM = get_package_share_directory('ros_gz_sim')
 # ── Spawn coordinates ────────────────────────────────────────────────────
 
 _SPAWN_RADIUS = 3.5    # [m]  circle radius
-_SPAWN_DEPTH  = -3   # [m]  depth
+_SPAWN_DEPTH  = -1   # [m]  depth
 
 _angle   = random.uniform(0.0, 2.0 * math.pi)
 _spawn_x = _SPAWN_RADIUS * math.cos(_angle)
@@ -369,26 +369,6 @@ def generate_launch_description():
         }],
     )
 
-    # ── Ping360 circle fitting (cage radius + centre) ─────────────────────────
-    # Subscribes to /ping360/points (PointCloud2 if available) at ~0.5–1 Hz.
-    # Publishes /perception/cage_radius, /perception/cage_center,
-    #           /perception/circle_valid
-    ping360_circle_fitting_node = Node(
-        package='auv_perception',
-        executable='ping360_circle_fitting',
-        name='ping360_circle_fitting',
-        output='screen',
-        parameters=[{
-            'use_sim_time': True,
-            'min_radius':                5.0,
-            'max_radius':                25.0,
-            'min_dead_zone':             0.5,
-            'ransac_iterations':         1000,
-            'ransac_distance_threshold': 0.3,
-            'min_inlier_ratio':          0.4,
-        }],
-    )
-
     # ── Ping360 nearest — orientation + full-scan signal for GLOBAL_SEARCH ─────
     # net_approach_2D_sono uses /perception/net_orientation (PoseStamped) and
     # /perception/full_scan_ready (Bool) from this node to align toward the net
@@ -417,9 +397,9 @@ def generate_launch_description():
         }],
     )
 
-    # ── Phase 3 — Inspection orbit (2D Sonoptix + Ping360 pitch) ─────────────
+    # ── Phase 3 — Inspection orbit (2D Sonoptix) ──────────────────────────────
     # Subscribes to /perception/net_distance, /perception/net_yaw_target,
-    #               /perception/perception_valid, /perception/cage_radius.
+    #               /perception/perception_valid.
     phase3_node = Node(
         package='AUV_guidance',
         executable='phase3_inspection_2D_sono',
@@ -437,7 +417,6 @@ def generate_launch_description():
         actions=[
             ping360_nearest_node,           # Phase 2 GLOBAL_SEARCH orientation
             sonoptix_2D_perception_node,    # Phase 2 approach distance + Phase 3 orbit
-            ping360_circle_fitting_node,    # Phase 3 cage geometry (radius → pitch)
             net_approach_node,
             phase3_node,
         ],

@@ -39,7 +39,7 @@ setup(
     zip_safe=True,
     maintainer='titou',
     maintainer_email='titou@todo.todo',
-    description='TODO: Package description',
+    description='BlueROV2 robot description: URDF models (incl. Bluerov2_realistic_2D with Sonoptix ECHO 2D), Gazebo world files, and helper nodes (depth sensor, IMU republisher).',
     license='Apache-2.0',
     extras_require={
         'test': [

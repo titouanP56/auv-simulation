@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='titou',
     maintainer_email='titoup56700@gmail.com',
-    description='TODO: Package description',
+    description='Sonar perception nodes for AUV net inspection: Sonoptix 2D RANSAC estimator (primary), Ping360 net orientation + cage-radius fitting, 3D RANSAC legacy estimator.',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -38,7 +38,6 @@ setup(
             'sonoptix_perception = auv_perception.sonoptix_perception:main',
             'sonoptix_2D_perception = auv_perception.sonoptix_2D_perception:main',
             'ping360_bridge_player = auv_perception.ping360_bridge_player:main',
-            'ping360_circle_fitting = auv_perception.ping360_circle_fitting:main',
         ],
     },
 )

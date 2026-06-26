@@ -4,6 +4,8 @@
 
 This package is the **mission brain** of the AUV. It contains the full autonomous inspection state machine (Phase 2 + Phase 3) and the thruster bridges that translate wrench commands into motor signals.
 
+The **active mission pipeline** uses the **Sonoptix ECHO 2D** sonar for net detection (via `net_approach_2D_sono` and `phase3_inspection_2D_sono`). The Ping360 is used only for the initial search phase.
+
 ---
 
 ## Quick Start
@@ -13,10 +15,10 @@ cd ~/AUV_project/ros2_AUV
 colcon build --packages-select AUV_guidance
 source install/setup.bash
 
-# Full autonomous mission — small net (default)
-ros2 launch AUV_guidance net_full_inspection.launch.py
+# Full autonomous mission — 2D Sonoptix pipeline (recommended)
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py
 
-# Full autonomous mission — large net (ocean_40m.xml)
+# Full autonomous mission — large net variant
 ros2 launch AUV_guidance net_inspection_big_net.launch.py
 ```
 
@@ -28,8 +30,10 @@ See [Section 3 — Launch Arguments](#3-launch-arguments) for all options.
 
 | Executable | File | Role |
 |---|---|---|
-| `net_approach` | `net_approach.py` | Phase 2: dive → find net → approach → standoff |
-| `phase3_inspection` | `phase3_inspection.py` | Phase 3: orbit small net |
+| `net_approach_2D_sono` | `net_approach_2D_sono.py` | **Phase 2** (active): dive → Ping360 search → approach with Sonoptix 2D → standoff |
+| `net_approach` | `net_approach.py` | Phase 2 (legacy): uses 3D Sonoptix PointCloud2 |
+| `phase3_inspection_2D_sono` | `phase3_inspection_2D_sono.py` | **Phase 3** (active): orbit with Sonoptix 2D distance + yaw |
+| `phase3_inspection` | `phase3_inspection.py` | Phase 3 (legacy): uses 3D Sonoptix PoseStamped |
 | `phase3_inspection_big_net` | `phase3_inspection_big_net.py` | Phase 3: orbit large net (different PID gains) |
 | `sim_thruster_bridge` | `sim_thruster_bridge.py` | Wrench → 8× Float64 thruster commands (Gazebo) |
 | `bluerov2_bridge` | `bluerov2_bridge.py` | Wrench → MAVROS RC PWM (real BlueROV2) |
@@ -38,31 +42,34 @@ See [Section 3 — Launch Arguments](#3-launch-arguments) for all options.
 
 ## 1. Mission Architecture
 
-### Phase 2 — `net_approach` (net_approach.py)
+### Phase 2 — `net_approach_2D_sono` (active)
 
-Responsible for getting the robot from its spawn point to a stable 1.5 m standoff in front of the net.
+Responsible for getting the robot from its spawn point to a stable 1.5 m standoff in front of the net. The Ping360 is used for the initial global search; the **Sonoptix 2D** takes over as soon as the robot starts approaching.
 
 **State machine:**
 
 ```
 DESCENDING
-    │ depth stable for 2 s at TARGET_DEPTH
+    │ depth stable for 2 s at TARGET_DEPTH (−3 m)
     ▼
 GLOBAL_SEARCH
     │ AUV holds position; ping360_nearest performs a full 360° scan
-    │ transitions immediately on /perception/full_scan_ready = True
+    │ transitions on /perception/full_scan_ready = True
+    │ (uses /perception/net_orientation from Ping360)
     ▼
 ALIGNING
-    │ PD yaw control until facing the net (within 10°)
+    │ PD yaw control until facing the net (within 10°, hold 1 s)
     ▼
 APPROACHING
-    │ forward surge + sonoptix_perception distance control
+    │ forward surge + Sonoptix 2D distance control
+    │ (uses /perception/net_distance — Float32 from sonoptix_2D_perception)
     ▼
 STABILIZING
     │ hold standoff for STABILIZE_TIME = 3 s
     ▼
-STANDOFF  ─── publishes /mission/phase2_done = True
-              broadcasts local_origin TF frame for Phase 3
+STANDOFF
+    │ waits 5 s, then publishes /mission/phase2_done = True
+    └─ broadcasts local_origin TF frame for Phase 3
 ```
 
 **Key subscriptions:**
@@ -71,9 +78,9 @@ STANDOFF  ─── publishes /mission/phase2_done = True
 |---|---|---|
 | `/odometry/filtered` | `nav_msgs/Odometry` | Robot pose |
 | `/perception/net_orientation` | `geometry_msgs/PoseStamped` | Net direction (from ping360_nearest) |
-| `/perception/full_scan_ready` | `std_msgs/Bool` | Confirms a full rotation is done |
-| `/sonoptix/perception` | `geometry_msgs/PoseStamped` | Net distance during approach |
-| `/sonoptix/perception_valid` | `std_msgs/Bool` | RANSAC validity gate |
+| `/perception/full_scan_ready` | `std_msgs/Bool` | Confirms a full Ping360 rotation is done |
+| `/perception/net_distance` | `std_msgs/Float32` | Net distance (from sonoptix_2D_perception) |
+| `/perception/perception_valid` | `std_msgs/Bool` | RANSAC validity gate |
 
 **Key publications:**
 
@@ -85,9 +92,9 @@ STANDOFF  ─── publishes /mission/phase2_done = True
 
 ---
 
-### Phase 3 — `phase3_inspection` / `phase3_inspection_big_net`
+### Phase 3 — `phase3_inspection_2D_sono` (active)
 
-Orbits the net perimeter at a fixed standoff distance, descending by `DEPTH_STEP` after each complete lap.
+Orbits the net perimeter at a fixed standoff distance, descending by `DEPTH_STEP` after each complete lap. Uses the **Sonoptix 2D** for both distance regulation and yaw alignment.
 
 **State machine:**
 
@@ -97,9 +104,9 @@ WAITING
     ▼
 WALKING_THE_NET  ◄──────────────────────────────┐
     │                                            │
-    │ sonar lost or RANSAC invalid > 2 s         │ sonar recovered
+    │ sonar lost or RANSAC invalid > 2 s         │ sonar + RANSAC recovered
     ▼                                            │
-LOST_WALL  ─── pulls back + rotates slowly ─────┘
+LOST_WALL  ─── pulls back (Fx=−5) + rotates ───┘
     │
     │ accumulated yaw ≥ 2π  →  decrement depth, reset yaw
     │ depth ≤ FINAL_DEPTH_LIMIT  →
@@ -107,24 +114,30 @@ LOST_WALL  ─── pulls back + rotates slowly ─────┘
 LAP_COMPLETED  ─── publishes /mission/phase3_done = True
 ```
 
-**Four simultaneous PID controllers:**
+**Five simultaneous PID controllers:**
 
 | DOF | Controller | Set point |
 |---|---|---|
 | Depth (Fz) | PID | `TARGET_DEPTH` (decrements per lap) |
-| Standoff (Fx) | PID | `STANDOFF_DIST` = 1.5 m |
+| Standoff (Fx) | PID | `STANDOFF_DIST` = 1.5 m (from `/perception/net_distance`) |
 | Sway velocity (Fy) | PID | 0.25 m/s lateral orbit speed |
-| Yaw (Mz) | PID + EMA | net normal yaw error |
+| Yaw (Mz) | PID + EMA + rate-limit | net normal yaw from `/perception/net_yaw_target` |
+| Pitch (My) | PID | net cone angle (only in `in_cone_mode`) |
 
-**Cone mode:** When the net is conical (radius decreasing), the node detects the radius shrinking below 90% of `R_ref` and enables a pitch PID controller to follow the angled net surface to the apex.
+**Range filtering on the sonar distance:**
+- **Spike filter**: rejects jumps > 0.3 m (up to 5 consecutive rejections).
+- **EMA filter** (α = 0.5): smooths validated range values.
+
+**Cone mode:** When the net is conical, the node detects the estimated orbit radius shrinking below 90% of `R_ref` (measured over the first 30 s) and enables the pitch PID after a 3 s confirmation window.
 
 **Key subscriptions:**
 
 | Topic | Type | Purpose |
 |---|---|---|
 | `/odometry/filtered` | `nav_msgs/Odometry` | Robot pose |
-| `/sonoptix/perception` | `geometry_msgs/PoseStamped` | Net distance + orientation |
-| `/sonoptix/perception_valid` | `std_msgs/Bool` | RANSAC validity |
+| `/perception/net_distance` | `std_msgs/Float32` | Net distance from Sonoptix 2D |
+| `/perception/net_yaw_target` | `std_msgs/Float32` | Net yaw from Sonoptix 2D |
+| `/perception/perception_valid` | `std_msgs/Bool` | RANSAC validity |
 | `/mission/phase2_done` | `std_msgs/Bool` | Start trigger |
 
 **Key publications:**
@@ -151,58 +164,49 @@ Converts the `Wrench` to MAVROS `OverrideRCIn` (1100–1900 µs PWM) for the 8 t
 
 ## 2. Key Tuning Constants
 
-All these constants are defined at the top of their respective files and can be changed without recompiling (they are Python, not ROS parameters). Rebuild and re-source after editing.
+All these constants are defined at the top of their respective files (Python, not ROS parameters). Rebuild and re-source after editing.
 
-**`net_approach.py`:**
+**`net_approach_2D_sono.py`:**
 
 | Constant | Default | Effect |
 |---|---|---|
-| `TARGET_DEPTH` | `-2.0` m | Initial dive depth |
+| `TARGET_DEPTH` | `−3.0` m | Initial dive depth |
 | `STANDOFF_DIST` | `1.5` m | Desired distance from net surface |
 | `KP_YAW / KD_YAW` | `5.0 / 2.0` | Yaw alignment aggressiveness |
 | `KP_SURGE` | `6.0` | Forward approach speed |
 | `GLOBAL_SEARCH_TIMEOUT_SEC` | `60` s | Timeout before emitting a warning |
 
-**`phase3_inspection.py` (small net):**
+**`phase3_inspection_2D_sono.py` (small net):**
 
 | Constant | Default | Effect |
 |---|---|---|
 | `ORBIT_DIRECTION` | `+1` | +1 = CCW, -1 = CW orbit |
 | `STANDOFF_DIST` | `1.5` m | Distance from net surface |
 | `DEPTH_STEP` | `0.5` m | Depth decrement per lap |
-| `FINAL_DEPTH_LIMIT` | `-6.0` m | Stop depth |
+| `FINAL_DEPTH_LIMIT` | `−6.0` m | Stop depth |
 | `LOST_WALL_TIMEOUT` | `2.0` s | Sonar silence before LOST_WALL |
-
-**`phase3_inspection_big_net.py` (large net) — same constants but:**
-
-| Constant | Value | Why different |
-|---|---|---|
-| `FINAL_DEPTH_LIMIT` | `-29.5` m | Big net goes 30 m deep |
-| `KP_DEPTH` | `20.0` | Stronger depth hold at depth |
-| `KD_DEPTH` | `20.0` | Damping for depth controller |
-| `KP_DIST` | `12.0` | Faster standoff correction |
-| `KP_VEL_SWAY` | `40.0` | Stronger lateral push |
-| `KP_YAW / MAX_YAW_CMD` | `10.0 / 20.0` | More aggressive yaw on large net |
+| `KP_DIST / KI_DIST / KD_DIST` | `4.0 / 0.2 / 0.5` | Standoff PID |
+| `KP_VEL_SWAY` | `15.0` | Lateral orbit speed controller |
+| `KP_YAW / KI_YAW / KD_YAW` | `5.0 / 0.02 / 1.0` | Yaw alignment PID |
 
 ---
 
 ## 3. Launch Arguments
-
-Both launch files accept the same arguments:
 
 | Argument | Default | Description |
 |---|---|---|
 | `headless` | `False` | Run Gazebo without GUI |
 | `use_hardware` | `False` | Real BlueROV2 (disables Gazebo, starts MAVROS) |
 | `rviz` | `False` | Open RViz2 |
-| `world_file` | see below | World file in `AUV_description/world/` |
-| `gz_delay` | `8.0` | Seconds to wait before spawning nodes |
+| `world_file` | `small_net.xml` | World file in `AUV_description/world/` |
+| `gz_delay` | `8.0` | Seconds to wait before spawning mission nodes |
 | `optimize` | `False` | Performance mode (see below) |
 
-| Launch file | Default world |
-|---|---|
-| `net_full_inspection.launch.py` | `small_net.xml` |
-| `net_inspection_big_net.launch.py` | `ocean_40m.xml` |
+| Launch file | Default world | Pipeline |
+|---|---|---|
+| `net_full_inspection_true_auv.launch.py` | `small_net.xml` | **2D Sonoptix (active)** |
+| `net_full_inspection.launch.py` | `small_net.xml` | 3D Sonoptix (legacy) |
+| `net_inspection_big_net.launch.py` | `ocean_40m.xml` | Large net |
 
 ---
 
@@ -213,7 +217,7 @@ Both launch files accept the same arguments:
 | Gazebo physics step | 1 ms | 6 ms |
 | URDF sensor rates | Full | Reduced |
 | Control loop rate | 20 Hz | 5 Hz |
-| Yaw EMA filter α | 1.0 (raw) | 0.15 (smoothed) |
+| Yaw EMA filter α | 0.15 | 1.0 (raw, no smoothing) |
 
 The world file physics patch is applied in memory only — original files are never modified.
 
@@ -223,8 +227,9 @@ The world file physics patch is applied in memory only — original files are ne
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Robot stuck in `GLOBAL_SEARCH` forever | `ping360_nearest` not running or no scan | Check `ping360_nearest` is in the delayed mission |
-| Robot approaches and immediately turns away | Yaw target wrong by 180° | Check `_spawn_yaw` sign in the launch file |
-| Phase 3 immediately enters `LOST_WALL` | Sonoptix bridge not started | Ensure `sonoptix_perception` is in delayed_mission |
-| Orbit drifts away from net | Standoff PID gains too low | Increase `KP_DIST` in the phase3 file |
+| Robot stuck in `GLOBAL_SEARCH` forever | `ping360_nearest` not running or no scan | Check that `ping360_nearest` is in the delayed mission |
+| Robot approaches but RANSAC invalid | Sonoptix bridge not started | Ensure `sonoptix_2D_perception` is in delayed_mission |
+| Phase 3 immediately enters `LOST_WALL` | No `/perception/net_distance` data | Check `sonoptix_2D_perception` is running and bridge is up |
+| Orbit drifts away from net | Standoff PID gains too low | Increase `KP_DIST` in `phase3_inspection_2D_sono.py` |
 | Robot oscillates yaw rapidly | Yaw EMA alpha too high | Lower `yaw_ema_alpha` (e.g. `0.15`) or increase `KD_YAW` |
+| Phase 3 never exits LOST_WALL | Sonoptix out of net range | Check `STANDOFF_DIST` vs net geometry |

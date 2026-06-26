@@ -33,17 +33,18 @@ Everything runs in **Gazebo Harmonic simulation** out of the box. Switching to t
 ### Sensor pipeline at a glance
 
 ```
-Ping360 (2D sonar)  →  ping360_nearest      →  net orientation & initial yaw
-Sonoptix (3D sonar) →  sonoptix_perception  →  net distance + normal vector (RANSAC)
-DVL + IMU + Depth   →  EKF (robot_loc.)     →  /odometry/filtered
-                                                      │
-                             net_approach (Phase 2)  ◄┘
-                             phase3_inspection (Phase 3)
-                                      │
-                             /auv/command_wrench
-                                      │
-                    sim_thruster_bridge ──► /cmd_vel_1…8 (Gazebo)
-                    bluerov2_bridge    ──► MAVROS RC PWM (real hardware)
+Ping360 (360° sonar)      →  ping360_nearest       →  /perception/net_orientation (initial yaw)
+Sonoptix ECHO 2D (25 Hz)  →  sonoptix_2D_perception →  /perception/net_distance
+                                                        /perception/net_yaw_target
+DVL + IMU + Depth         →  EKF (robot_loc.)      →  /odometry/filtered
+                                                               │
+                              net_approach_2D_sono (Phase 2)  ◄┘
+                              phase3_inspection_2D_sono (Phase 3)
+                                          │
+                               /auv/command_wrench
+                                          │
+                    sim_thruster_bridge  ──► /cmd_vel_1…8 (Gazebo)
+                    bluerov2_bridge      ──► MAVROS RC PWM (real hardware)
 ```
 
 ---
@@ -126,11 +127,11 @@ colcon build
 # 2. Source the workspace  ← do this in every new terminal
 source install/setup.bash
 
-# 3. Launch the full autonomous mission (small net)
-ros2 launch AUV_guidance net_full_inspection.launch.py
+# 3. Launch the full autonomous mission (2D Sonoptix pipeline)
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py
 ```
 
-Wait ~10 seconds for Gazebo to initialize. The robot will dive, find the net, and start orbiting automatically.
+Wait ~10 seconds for Gazebo to initialize. The robot will dive, find the net with the Ping360, then orbit using the Sonoptix ECHO 2D.
 
 **Large net variant:**
 ```bash
@@ -139,12 +140,12 @@ ros2 launch AUV_guidance net_inspection_big_net.launch.py
 
 **Faster physics — recommended on laptops:**
 ```bash
-ros2 launch AUV_guidance net_full_inspection.launch.py optimize:=True
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py optimize:=True
 ```
 
 **Real BlueROV2 hardware:**
 ```bash
-ros2 launch AUV_guidance net_full_inspection.launch.py use_hardware:=True
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py use_hardware:=True
 ```
 
 ---
@@ -170,7 +171,7 @@ First build takes 5–15 minutes. Subsequent builds use Docker's layer cache.
 ```bash
 docker run --rm -it --net=host ros2_auv:latest \
   bash -c "source /ros2_ws/install/setup.bash && \
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True"
+  ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=True optimize:=True"
 ```
 
 **With Gazebo window:**
@@ -180,7 +181,7 @@ docker run --rm -it --net=host \
   -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
   ros2_auv:latest \
   bash -c "source /ros2_ws/install/setup.bash && \
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False"
+  ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=False"
 ```
 
 ---
@@ -200,7 +201,7 @@ cd ~/AUV_project/ros2_AUV && docker build -t ros2_auv:latest .
 # Step 3a — headless
 docker run --rm -it --net=host ros2_auv:latest \
   bash -c "source /ros2_ws/install/setup.bash && \
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True"
+  ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=True optimize:=True"
 
 # Step 3b — with Gazebo GUI (via WSLg)
 echo $DISPLAY   # should print ":0"
@@ -210,7 +211,7 @@ sudo -E docker run --rm -it --net=host \
   -v /tmp/.X11-unix:/tmp/.X11-unix -v /mnt/wslg:/mnt/wslg \
   ros2_auv:latest \
   bash -c "source /ros2_ws/install/setup.bash && \
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=False"
+  ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=False"
 ```
 
 ---
@@ -221,7 +222,7 @@ sudo -E docker run --rm -it --net=host \
 # Terminal 1 — simulation
 docker run --rm -it --net=host --name ros2_auv_sim ros2_auv:latest \
   bash -c "source /ros2_ws/install/setup.bash && \
-  ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True"
+  ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=True optimize:=True"
 
 # Terminal 2 — Foxglove bridge
 docker exec -it ros2_auv_sim \
@@ -237,45 +238,56 @@ Then open [Foxglove Studio](https://foxglove.dev/download) → **Open connection
 The workspace is split into 6 ROS 2 packages. Each has its own `README.md` with full details.
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                    SENSORS (Gazebo)                   │
-│  Ping360 (2D)   Sonoptix (3D)   DVL   IMU   Depth   │
-└──┬──────────────────┬─────────────────────┬───────────┘
-   │                  │                     │
-   ▼                  ▼                     ▼
-ping360_nearest  sonoptix_perception   my_auv_localization
-  (DBSCAN +       (RANSAC plane fit)   (EKF: DVL+IMU+Depth)
-   full-scan)      PoseStamped out      /odometry/filtered
-   net yaw out    net dist + normal
-       │                  │                     │
-       └──────────────────┴──────────────────── ┘
-                          │
-                   AUV_guidance
-              ┌─────────────────────┐
-              │ Phase 2: net_approach│  DESCENDING → GLOBAL_SEARCH
-              │                     │  → ALIGNING → APPROACHING
-              │                     │  → STABILIZING → STANDOFF
-              │ Phase 3: inspection  │  WAITING → WALKING_THE_NET
-              │                     │  → (LOST_WALL) → LAP_COMPLETED
-              └─────────┬───────────┘
-                        │ /auv/command_wrench
-             ┌──────────┴──────────┐
-             ▼                     ▼
-    sim_thruster_bridge     bluerov2_bridge
-    
-    (Gazebo)                (real hardware)
+┌────────────────────────────────────────────────────────────┐
+│                      SENSORS (Gazebo)                       │
+│  Ping360 (360°)   Sonoptix ECHO 2D (25Hz)   DVL  IMU  Depth│
+└──┬────────────────────────┬────────────────────┬────────────┘
+   │                        │                    │
+   ▼                        │                    ▼
+ping360_nearest              │          my_auv_localization
+(DBSCAN+RANSAC)              │          (EKF: DVL+IMU+Depth)
+→ net_orientation            │          /odometry/filtered
+→ full_scan_ready            │                    │
+                             ▼                    │
+                  sonoptix_2D_perception           │
+                  (RANSAC poly deg-2)              │
+                  → net_distance                   │
+                  → net_yaw_target                 │
+                             │                    │
+                             └──────────┬──────────┘
+                                        ▼
+                                 AUV_guidance
+                        ┌──────────────────────────┐
+                        │ Phase 2:                  │  DESCENDING → GLOBAL_SEARCH
+                        │ net_approach_2D_sono      │  → ALIGNING → APPROACHING
+                        │                           │  → STABILIZING → STANDOFF
+                        │ Phase 3:                  │  WAITING → WALKING_THE_NET
+                        │ phase3_inspection_2D_sono │  → (LOST_WALL) → LAP_COMPLETED
+                        └──────────┬───────────────┘
+                                   │ /auv/command_wrench
+                      ┌────────────┴────────────┐
+                      ▼                         ▼
+             sim_thruster_bridge         bluerov2_bridge
+             (Gazebo)                    (real hardware)
 ```
 
 ### Package summary
 
 | Package | Role |
 |---|---|
-| [`AUV_guidance`](src/AUV_guidance/README.md) | Mission state machines (Phase 2 & 3), thruster bridges |
-| [`AUV_description`](src/AUV_description/README.md) | Robot URDF, Gazebo worlds, IMU/depth helper nodes |
-| [`auv_perception`](src/auv_perception/README.md) | Ping360 net finder, Sonoptix RANSAC plane estimator |
+| [`AUV_guidance`](src/AUV_guidance/README.md) | Mission state machines (Phase 2 & 3, **2D Sonoptix**), thruster bridges |
+| [`AUV_description`](src/AUV_description/README.md) | Robot URDF (`Bluerov2_realistic_2D`), Gazebo worlds, IMU/depth helper nodes |
+| [`auv_perception`](src/auv_perception/README.md) | Sonoptix 2D RANSAC estimator (main), Ping360 net finder |
 | [`my_auv_localization`](src/my_auv_localization/README.md) | EKF configuration (DVL + IMU + Depth → odometry) |
 | [`auv_dvl_bridge`](src/auv_dvl_bridge/README.md) | Gazebo DVL protobuf → ROS 2 TwistWithCovariance (C++) |
 | [`AUV_controller`](src/AUV_controller/README.md) | ⚠️ Archived — MPC research, not used in current mission |
+
+### 🔀 Note about the 3D Sonar Pipeline (Alternative)
+
+While the active mission uses the **2D Sonoptix** configuration (`LaserScan` at 25 Hz) for optimal performance and control stability, a full **3D Sonar pipeline** is also available in the repository:
+- The `sonoptix_perception` node (in `auv_perception`) processes raw `PointCloud2` data from a true 3D Sonoptix ECHO simulation.
+- It uses a 3D RANSAC plane-fitting algorithm to compute the 3D net distance and normal vector (`PoseStamped`).
+- You can switch to the 3D pipeline by using the `Bluerov2_realistic.urdf.xml` model and the corresponding 3D guidance nodes (`net_approach_node` and `phase3_inspection`), which are preserved for research and comparison purposes.
 
 > **`asv_wave_sim`**: Third-party ocean wave plugin. Excluded from `colcon build` via `COLCON_IGNORE`. Not required for the main missions. See `src/asv_wave_sim/README.md` if you need wave simulation.
 
@@ -283,14 +295,14 @@ ping360_nearest  sonoptix_perception   my_auv_localization
 
 ## 6. Launch Arguments Reference
 
-Both `net_full_inspection.launch.py` and `net_inspection_big_net.launch.py` accept the same arguments:
+`net_full_inspection_true_auv.launch.py` (recommended) and `net_inspection_big_net.launch.py` accept the same arguments:
 
 | Argument | Default | Description |
 |---|---|---|
 | `headless` | `False` | Run Gazebo without the 3D GUI (saves GPU/CPU) |
 | `use_hardware` | `False` | Deploy on the real BlueROV2 (disables Gazebo, starts MAVROS) |
 | `rviz` | `False` | Open RViz2 for TF/sensor visualization |
-| `world_file` | see below | Gazebo world file (in `AUV_description/world/`) |
+| `world_file` | `small_net.xml` | Gazebo world file (in `AUV_description/world/`) |
 | `gz_delay` | `8.0` | Seconds to wait for Gazebo before spawning nodes. Increase on slow machines. |
 | `optimize` | `False` | Performance mode — coarser physics, slower loops. See [Section 7](#7-performance--optimize-mode). |
 
@@ -306,20 +318,20 @@ Both `net_full_inspection.launch.py` and `net_inspection_big_net.launch.py` acce
 ### Example commands
 
 ```bash
-# Default — small net with GUI
-ros2 launch AUV_guidance net_full_inspection.launch.py
+# Default — small net with GUI (2D Sonoptix pipeline)
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py
 
 # Headless + fast physics (CI / low-end laptop)
-ros2 launch AUV_guidance net_full_inspection.launch.py headless:=True optimize:=True
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py headless:=True optimize:=True
 
 # With RViz2
-ros2 launch AUV_guidance net_full_inspection.launch.py rviz:=True
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py rviz:=True
 
 # Large net
 ros2 launch AUV_guidance net_inspection_big_net.launch.py headless:=False
 
 # Real hardware
-ros2 launch AUV_guidance net_full_inspection.launch.py use_hardware:=True
+ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py use_hardware:=True
 ```
 
 ---
@@ -366,10 +378,14 @@ ros2 run foxglove_bridge foxglove_bridge
 |---|---|
 | `/mission/phase` | Current mission state (DESCENDING, ALIGNING…) |
 | `/odometry/filtered` | Robot position & velocity (EKF output) |
-| `/sonoptix/perception` | Distance to net + normal vector |
-| `/phase3/wall_distance` | Raw sonar distance |
-| `/phase3/wall_distance_smoothed` | EMA-filtered distance |
-| `/phase3/yaw_error` | Angular alignment error |
+| `/perception/net_distance` | Net distance from Sonoptix 2D [m] |
+| `/perception/net_yaw_target` | Net alignment yaw from Sonoptix 2D [rad] |
+| `/perception/perception_valid` | Sonoptix 2D RANSAC validity |
+| `/perception/net_orientation` | Net direction from Ping360 (Phase 2 only) |
+| `/perception/cage_radius` | Cage radius from Ping360 (cone mode) |
+| `/phase3/wall_distance` | Raw sonar distance [m] |
+| `/phase3/wall_distance_smoothed` | Spike-filtered + EMA distance |
+| `/phase3/yaw_error` | Angular alignment error [rad] |
 | `/phase3/yaw_accumulated` | Total yaw turned (lap tracking) |
 | `/phase3/real_time_factor` | Simulation RTF |
 
@@ -431,10 +447,11 @@ ros2 param list /phase3_inspection
 
 | File | Constant | Effect |
 |---|---|---|
-| `phase3_inspection.py` | `STANDOFF_DIST` | Distance from net surface (default 1.5 m) |
-| `phase3_inspection.py` | `ORBIT_DIRECTION` | +1 = counter-clockwise, -1 = clockwise |
-| `phase3_inspection.py` | `DEPTH_STEP` | Depth decrement per lap (default 0.5 m) |
-| `phase3_inspection.py` | `FINAL_DEPTH_LIMIT` | Stop depth (small net: −6 m, big net: −29.5 m) |
-| `net_approach.py` | `STANDOFF_DIST` | Same — standoff for approach phase |
-| `net_approach.py` | `TARGET_DEPTH` | Initial dive target (default −2 m) |
-| `sonoptix_perception.py` | `ransac_distance_threshold` | RANSAC inlier tolerance [m] |
+| `phase3_inspection_2D_sono.py` | `STANDOFF_DIST` | Distance from net surface (default 1.5 m) |
+| `phase3_inspection_2D_sono.py` | `ORBIT_DIRECTION` | +1 = counter-clockwise, -1 = clockwise |
+| `phase3_inspection_2D_sono.py` | `DEPTH_STEP` | Depth decrement per lap (default 0.5 m) |
+| `phase3_inspection_2D_sono.py` | `FINAL_DEPTH_LIMIT` | Stop depth (default −6 m) |
+| `phase3_inspection_2D_sono.py` | `KP_DIST / KI_DIST / KD_DIST` | Standoff PID gains |
+| `net_approach_2D_sono.py` | `STANDOFF_DIST` | Standoff for approach phase |
+| `net_approach_2D_sono.py` | `TARGET_DEPTH` | Initial dive target (default −3 m) |
+| `sonoptix_2D_perception.py` | `ransac_residual_threshold` | RANSAC inlier tolerance [m] |

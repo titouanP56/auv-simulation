@@ -1,3 +1,71 @@
+#!/usr/bin/env python3
+"""
+phase3_inspection_2D_sono.py
+============================
+ROS 2 guidance node — Phase 3 of the AUV mission: orbital inspection of an
+aquaculture net using the **Sonoptix ECHO 2D** sonar.
+
+This is the **active Phase 3 node** used by `net_full_inspection_true_auv.launch.py`.
+
+Mission State Machine
+---------------------
+  WAITING
+    ↓ /mission/phase2_done = True received
+  WALKING_THE_NET  ←──────────────────────────┐
+    ↓ sonar lost > LOST_WALL_TIMEOUT (2 s)    │ sonar recovered
+  LOST_WALL ─── pulls back (Fx=−5) + rotates ┘
+    ↓ accumulated yaw ≥ 2π → decrement depth, reset yaw accumulator
+    ↓ depth ≤ FINAL_DEPTH_LIMIT
+  LAP_COMPLETED ─── publishes /mission/phase3_done = True
+
+Five simultaneous PID controllers
+----------------------------------
+  Fz  (depth)      : PID — TARGET_DEPTH (decrements by DEPTH_STEP each lap)
+  Fx  (standoff)   : PID — STANDOFF_DIST from /perception/net_distance
+  Fy  (sway vel.)  : PID — 0.25 m/s lateral orbit speed
+  Mz  (yaw)        : PID + EMA + rate-limit — from /perception/net_yaw_target
+  My  (pitch)      : PID — only when in_cone_mode = True (conical net apex)
+
+Sonar distance filtering
+-------------------------
+  Spike filter: rejects jumps > SPIKE_THRESHOLD (0.3 m), up to MAX_CONSEC_SPIKES.
+  EMA filter (α = 0.5): smooths validated distance values.
+
+Cone mode detection
+--------------------
+  The node estimates orbit radius from odometry + local_origin TF over the first
+  RADIUS_REF_WINDOW (30 s). If current radius < 90% of R_ref for more than
+  CONE_CONFIRM_TIME (3 s), `in_cone_mode` is activated and the pitch PID engages.
+
+Subscriptions
+-------------
+  /odometry/filtered          nav_msgs/Odometry
+  /perception/net_distance    std_msgs/Float32
+  /perception/net_yaw_target  std_msgs/Float32
+  /perception/perception_valid std_msgs/Bool
+  /mission/phase2_done        std_msgs/Bool
+
+Publications
+------------
+  /auv/command_wrench  geometry_msgs/Wrench
+  /mission/phase        std_msgs/String
+  /mission/phase3_done  std_msgs/Bool
+  /phase3/*             std_msgs/Float64 (diagnostic telemetry)
+
+Key constants (top of file, no recompile needed)
+------------------------------------------------
+  STANDOFF_DIST    1.5 m     Desired distance from net surface
+  ORBIT_DIRECTION  +1        +1 = CCW, −1 = CW orbit
+  DEPTH_STEP       0.5 m     Depth decrement after each full lap
+  FINAL_DEPTH_LIMIT −6.0 m  Stop depth
+  KP_DIST/KI/KD    4.0/0.2/0.5  Standoff PID
+  KP_YAW/KI/KD     5.0/0.02/1.0 Yaw alignment PID
+  KP_VEL_SWAY      15.0     Lateral orbit speed gain
+
+Author  : titou
+Package : AUV_guidance
+"""
+
 import math
 import numpy as np
 import time

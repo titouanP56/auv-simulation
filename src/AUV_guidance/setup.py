@@ -21,7 +21,7 @@ setup(
     zip_safe=True,
     maintainer='titou',
     maintainer_email='titoup56700@gmail.com',
-    description='TODO: Package description',
+    description='Autonomous AUV mission nodes: Phase 2 net approach (Sonoptix 2D + Ping360) and Phase 3 orbital net inspection (Sonoptix 2D), plus simulation and hardware thruster bridges.',
     license='Apache-2.0',
     
     extras_require={

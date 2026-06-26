@@ -34,16 +34,19 @@ ros2_AUV/
 
 ## 🧭 Architecture générale de la mission
 
-Le projet implémente une **mission en 3 phases** pour l'inspection autonome d'un filet de cage aquacole :
+Le projet implémente une **mission en 3 phases** pour l'inspection autonome d'un filet de cage aquacole.
+La version principale du robot embarque un **Sonoptix ECHO 2D** (multi-beam sonar → LaserScan 25 Hz)
+qui assure le contrôle de distance/yaw en phases 2 et 3, ainsi qu'un **Ping360** (sonar rotatif 360°)
+utilisé uniquement pour l'orientation initiale (GLOBAL_SEARCH) et l'estimation du rayon de cage.
 
 ```
 Phase 1 — Descente initiale
       │
       ▼
-Phase 2 — Approche du filet  [AUV_guidance / net_approach]
+Phase 2 — Approche du filet  [AUV_guidance / net_approach_2D_sono]
       │  DESCENDING → GLOBAL_SEARCH → ALIGNING → APPROACHING → STABILIZING → STANDOFF
       ▼
-Phase 3 — Inspection orbitale [AUV_guidance / phase3_inspection]
+Phase 3 — Inspection orbitale [AUV_guidance / phase3_inspection_2D_sono]
            WAITING → WALKING_THE_NET → (LOST_WALL) → LAP_COMPLETED
 ```
 
@@ -107,26 +110,27 @@ DESCENDING
     ▼
 GLOBAL_SEARCH
     │  (rotation 360° du Ping360, détection orientation du filet)
+    │  → utilise /perception/net_orientation + /perception/full_scan_ready (ping360_nearest)
     ▼
 ALIGNING
     │  (PD yaw jusqu'à < 10° d'erreur pendant 1s)
     ▼
 APPROACHING
-    │  (avance vers le filet, contrôle P sur distance Sonoptix)
+    │  (avance vers le filet, contrôle P sur /perception/net_distance du Sonoptix 2D)
     ▼
 STABILIZING
     │  (maintien position pendant 3s)
     ▼
 STANDOFF
-    │  (publie TF local_origin pour Phase 3)
+    │  (publie TF local_origin pour Phase 3, attend 5s avant de signaler Phase 3 prête)
     ▼  → /mission/phase2_done = True
 ```
 
 **Topics clés (Phase 2)** :
-- Entrées : `/odometry/filtered`, `/perception/net_orientation`, `/perception/full_scan_ready`, `/perception/net_distance`
+- Entrées : `/odometry/filtered`, `/perception/net_orientation`, `/perception/full_scan_ready`, `/perception/net_distance`, `/perception/perception_valid`
 - Sorties : `/auv/command_wrench`, `/mission/phase`, `/mission/phase2_done`, `/mission/local_origin`
 
-### Machine à états — Phase 3 (`phase3_inspection.py`)
+### Machine à états — Phase 3 (`phase3_inspection_2D_sono.py`)
 
 ```
 WAITING
@@ -135,7 +139,7 @@ WAITING
 WALKING_THE_NET
     │  (orbite le long du filet, contrôle PID Fz/Fx/Fy/Mz)
     │  (détecte fin de tour via yaw accumulé ≥ 2π)
-    │  ← → LOST_WALL (si sonar perdu > 2s)
+    │  ← → LOST_WALL (si sonar perdu > 2s ou RANSAC invalide)
     ▼
 LAP_COMPLETED
     │  (descend d'un palier de profondeur ou fin de mission)
@@ -143,10 +147,22 @@ LAP_COMPLETED
 
 **Contrôle Phase 3** :
 - PID profondeur (Fz)
-- PID distance filet (Fx)
-- PID vitesse sway (Fy — vitesse orbitale)
-- PID yaw (Mz — alignement perpendiculaire au filet)
+- PID distance filet (Fx) — via `/perception/net_distance` (Sonoptix 2D)
+- PID vitesse sway (Fy — vitesse orbitale constante ±0.25 m/s)
+- PID yaw (Mz — alignement perpendiculaire au filet via `/perception/net_yaw_target`)
 - PID pitch (My — mode cône, uniquement si `in_cone_mode`)
+- **Détection mode cône** : si le rayon courant < 90% du rayon de référence (estimé sur les 30 premières secondes), déclenche le contrôle de pitch après 3s de confirmation.
+- **Filtre spike + EMA** sur la distance sonar : rejette les sauts > 0.3 m (configurable) et lisse avec α=0.5.
+
+**Paramètres PID Phase 3** :
+
+| Contrôleur | Kp | Ki | Kd |
+|---|---|---|---|
+| Profondeur | 10.0 | 0.2 | 0.2 |
+| Distance net | 4.0 | 0.2 | 0.5 |
+| Sway velocity | 15.0 | 2.0 | 0.5 |
+| Yaw | 5.0 | 0.02 | 1.0 |
+| Pitch | 10.0 | 0.2 | 2.0 |
 
 ### Fichiers launch
 
@@ -166,6 +182,12 @@ gz_delay:=8.0          # Délai avant démarrage des nœuds mission
 use_hardware:=False    # True = utilise MAVROS + BlueROV2 réel
 optimize:=False        # True = physique allégée, contrôle à 5 Hz
 ```
+
+**Nœuds mission lancés par `net_full_inspection_true_auv`** (avec délai `gz_delay`) :
+1. `ping360_nearest` — Orientation Ping360 (GLOBAL_SEARCH)
+2. `sonoptix_2D_perception` — Distance + yaw Sonoptix 2D (Phases 2 & 3)
+3. `net_approach_2D_sono` — Guidage Phase 2
+4. `phase3_inspection_2D_sono` — Guidage Phase 3
 
 ---
 
@@ -214,10 +236,9 @@ optimize:=False        # True = physique allégée, contrôle à 5 Hz
 | Fichier | Nœud | Sonar | Méthode |
 |---|---|---|---|
 | `ping360_nearest.py` | `ping360_nearest` | Ping360 (LaserScan) | DBSCAN + RANSAC polynôme deg-2 + ratio inliers |
+| `ping360_bridge_player.py` | — | — | Rejoue des bags Ping360 |
 | `sonoptix_perception.py` | `sonoptix_perception` | Sonoptix ECHO (PointCloud2) | RANSAC plan 3D (Open3D ou sklearn) |
 | `sonoptix_2D_perception.py` | `sonoptix_2D_perception` | Sonoptix ECHO (LaserScan) | RANSAC polynôme deg-2 2D |
-| `ping360_circle_fitting.py` | `ping360_circle_fitting` | Ping360 (PointCloud2) | RANSAC cercle → rayon/centre cage |
-| `ping360_bridge_player.py` | — | — | Rejoue des bags Ping360 |
 | `auto_saver_node.py` | — | — | Sauvegarde automatique OctoMap |
 | `bag_to_ply.py` | — | — | Convertit bags → fichiers PLY |
 | `bt_to_ply.py` | — | — | Convertit OctoMap .bt → PLY |
@@ -246,13 +267,30 @@ Point le plus proche sur la courbe → tangente → normale → yaw cible
 LaserScan @ 25 Hz → filtre range [0.3m, 7.0m] → tableau (N, 2) Cartésien
     ↓
 RANSAC polynôme deg-2 (heuristique swap-axes pour singularité verticale)
+    (200 itérations, seuil résidu 0.05m, ratio inliers min 30%)
     ↓
 Point le plus proche de l'origine → distance + normale → yaw (filtre EMA α=0.25)
     ↓
-/perception/net_distance (Float32) + /perception/net_yaw_target (Float32) + valid
+/perception/net_distance (Float32) + /perception/net_yaw_target (Float32) + /perception/perception_valid (Bool)
 ```
 
-### `sonoptix_perception.py` — Pipeline (3D)
+**Topics de debug Foxglove** :
+- `~/debug/raw_cloud` (POINTS gris) — tous les points filtrés
+- `~/debug/inlier_cloud` (POINTS verts) — inliers RANSAC (= le filet détecté)
+- `~/debug/ransac_curve` (LINE_STRIP rouge) — parabole fittée
+- `~/debug/normal_arrow` (ARROW cyan) — vecteur normal vers le robot
+
+**Paramètres ROS 2** :
+
+| Paramètre | Valeur | Description |
+|---|---|---|
+| `min_range` | 0.3 m | Zone morte |
+| `max_range` | 7.0 m | Coupure lointaine |
+| `ransac_residual_threshold` | 0.05 m | Seuil inlier |
+| `ransac_min_inliers_ratio` | 0.30 | Fraction minimale |
+| `min_points` | 10 | Points minimum pour RANSAC |
+
+### `sonoptix_perception.py` — Pipeline (3D, ancienne version)
 
 ```
 PointCloud2 → décodage NumPy vectorisé → filtre range 3D
@@ -276,15 +314,41 @@ Encodage quaternion ZYX → /sonoptix/perception (PoseStamped) + /sonoptix/perce
 |---|---|
 | `BlueROV2.urdf.xml` | URDF minimal |
 | `BlueROV2captors.urdf.xml` | Avec tous les capteurs |
-| `Bluerov2_realistic.urdf.xml` | Version réaliste (Sonoptix 3D) |
-| `Bluerov2_realistic_2D.urdf.xml` | **Version utilisée en mission** (Sonoptix 2D LaserScan) |
+| `Bluerov2_realistic.urdf.xml` | Version réaliste (Sonoptix 3D PointCloud2) |
+| `Bluerov2_realistic_2D.urdf.xml` | **Version principale en mission** (Sonoptix 2D LaserScan) |
+
+#### `Bluerov2_realistic_2D.urdf.xml` — Version réaliste avec Sonoptix 2D
+
+C'est le modèle **actuellement utilisé** en simulation (référencé dans les deux launch files principaux).
+Il intègre des paramètres hydrodynamiques réalistes et un profil de performance via xacro.
 
 **Capteurs simulés** :
-- Ping360 (`LibRayPlugin` → LaserScan 360°)
-- Sonoptix ECHO (`LibRayPlugin` → LaserScan ou PointCloud2)
-- IMU
-- DVL (Doppler Velocity Log → Gazebo protobuf)
-- Caméra (optionnelle)
+
+| Capteur | Frame | Type Gazebo | Topic ROS 2 | Fréquence | Caractéristiques |
+|---|---|---|---|---|---|
+| **Ping360** | `ping360_link` | `gpu_lidar` | `/ping360/scan` (LaserScan) | 10 Hz (1 Hz optimize) | 360 rays, range 0.75–15 m, σ=0.02 m |
+| **Sonoptix ECHO 2D** | `sonoptix_link` | `gpu_lidar` | `/sonoptix/points` (LaserScan) | **25 Hz** | 256 rays, ±60° (±1.047 rad), range 0.3–15 m, σ=0.03 m, inclinaison avant +5° |
+| **IMU** | `imu_link` | `imu` | `/imu` | 50 Hz (25 Hz optimize) | Bruit gyro σ=2e-4, accéléro σ=1.7e-2 |
+| **DVL** | `base_link` (sous le robot) | `dvl` (custom) | `/dvl/velocity` | 15 Hz (5 Hz optimize) | 4 faisceaux, σ=0.01 m/s |
+| **Caméra** | `camera_link` | `camera` | `/camera/image_raw` | — | Désactivée (commentée) |
+
+**Dynamique hydrodynamique** (plugin Gazebo `Hydrodynamics`) :
+- Masse ajoutée : Xu̇=6.36, Yv̇=7.12, Zẇ=12.0
+- Traînée linéaire : Xu=-4.03, Yv=-6.22, Zw=-5.18
+- Traînée quadratique : Xu|u|=-18.18, Yv|v|=-21.66, Zw|w|=-39.99
+
+**Profil de performance** (xacro arg `optimize`) :
+
+| Paramètre | Normal | Optimize |
+|---|---|---|
+| Ping360 samples | 360 | 90 |
+| Ping360 Hz | 10 | 1 |
+| Sonoptix h_samples | 64 | 16 |
+| Sonoptix Hz | 15 | 2 |
+| DVL Hz | 15 | 5 |
+| IMU Hz | 50 | 25 |
+
+> **Note** : En mode `optimize=False` (par défaut), le Sonoptix est configuré en **25 Hz** fixe (hardcodé dans l'URDF, indépendant du profil Xacro) avec 256 rays horizontaux.
 
 ### Mondes Gazebo (`world/`)
 
@@ -306,7 +370,16 @@ Encodage quaternion ZYX → /sonoptix/perception (PoseStamped) + /sonoptix/perce
 ### Scripts utilitaires (`scripts/`)
 
 - `simulated_depth_sensor` — Publie la profondeur depuis `/odom` sur `/depth/pose`
-- `imu_republisher` — Reformate le topic IMU
+- `imu_republisher` — Reformate le topic IMU (ajoute des covariances non-nulles pour l'EKF)
+
+### Fichiers launch AUV_description
+
+| Fichier | Description |
+|---|---|
+| `bluerov2_realist_bassin.launch.py` | Lance la simulation standalone (Gazebo + robot + EKF) dans le bassin NTNU |
+| `bluerov2_realist_net.launch.py` | Variante pour filet |
+
+> **`bluerov2_realist_bassin.launch.py`** charge automatiquement `Bluerov2_realistic_2D.urdf.xml` et configure les bridges Sonoptix 2D + Ping360.
 
 ---
 
@@ -356,17 +429,18 @@ Utilisé dans le monde `Bassin_ntnu_waves.xml`.
 ## 🔗 Graphe des topics principaux
 
 ```
-Ping360                                         Sonoptix ECHO
+Ping360                                         Sonoptix ECHO 2D
 /ping360/scan (LaserScan)                      /sonoptix/points (LaserScan)
        │                                                │
-       ▼                                                ▼
-ping360_nearest                               sonoptix_2D_perception
+       ├──────────────────────────────────────►  sonoptix_2D_perception
        │                                                │
-       ├─ /perception/net_orientation                   ├─ /perception/net_distance
-       └─ /perception/full_scan_ready                   ├─ /perception/net_yaw_target
-                          │                             └─ /perception/perception_valid
-                          │                                          │
-                          └──────────────┬──────────────────────────┘
+       ▼                                                ├─ /perception/net_distance
+ping360_nearest                                         ├─ /perception/net_yaw_target
+       │                                                └─ /perception/perception_valid
+       ├─ /perception/net_orientation                              │
+       └─ /perception/full_scan_ready                              │
+                          │                                        │
+                          └──────────────┬─────────────────────────┘
                                          ▼
                                net_approach_2D_sono  (Phase 2)
                                          │
@@ -413,6 +487,12 @@ ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py use_hardware:=Tr
 ros2 launch AUV_guidance net_full_inspection_true_auv.launch.py world_file:=small_net_current.xml
 ```
 
+### Simulation standalone (bassin NTNU, sans mission)
+
+```bash
+ros2 launch AUV_description bluerov2_realist_bassin.launch.py
+```
+
 ### Visualisation Foxglove
 
 ```bash
@@ -441,7 +521,7 @@ Ces bags contiennent des enregistrements de tests réels (vraisemblablement en b
 | `rclcpp` | Nœuds ROS 2 C++ |
 | `numpy` | Calcul vectoriel |
 | `sklearn` (scikit-learn) | DBSCAN, RANSAC fallback |
-| `open3d` | RANSAC plan 3D (backend principal) |
+| `open3d` | RANSAC plan 3D (backend principal, sonoptix_perception 3D) |
 | `do_mpc` | Contrôleur MPC non-linéaire |
 | `casadi` | Optimisation symbolique (utilisé par do_mpc) |
 | `robot_localization` | EKF (package ROS 2) |
@@ -453,16 +533,22 @@ Ces bags contiennent des enregistrements de tests réels (vraisemblablement en b
 
 ## 📝 Notes importantes
 
-1. **Le fichier `Bluerov2_realistic_2D.urdf.xml`** est le URDF actif en mission — le Sonoptix y est configuré comme un LaserScan 2D (et non PointCloud2).
+1. **`Bluerov2_realistic_2D.urdf.xml`** est le URDF **actuellement actif** en mission.
+   La différence clé avec `Bluerov2_realistic.urdf.xml` (version 3D) :
+   - Le Sonoptix y est configuré comme un **LaserScan 2D** (1 ligne horizontale de 256 rayons, ±60°) à **25 Hz**.
+   - Cette configuration permet de simuler un sonar multi-beam réaliste sans la lourdeur d'un PointCloud2 3D.
+   - Le capteur est légèrement incliné vers l'avant (+5° ≈ +0.087 rad en pitch) pour viser le filet face au robot.
 
-2. **La Phase 2 actuelle** (`net_full_inspection_true_auv.launch.py`) utilise :
-   - `net_approach_2D_sono` (Sonoptix LaserScan Float32)
-   - `phase3_inspection_2D_sono` (pipeline 2D)
+2. **La pipeline mission principale** (`net_full_inspection_true_auv.launch.py`) utilise :
+   - `net_approach_2D_sono` (Sonoptix LaserScan Float32) pour la Phase 2
+   - `phase3_inspection_2D_sono` (pipeline 2D) pour la Phase 3
 
-3. **Le Ping360** est utilisé **uniquement** pour la phase de recherche globale (`GLOBAL_SEARCH`) et la détection du rayon de la cage (`ping360_circle_fitting`).
+3. **Le Ping360** est utilisé uniquement pendant la phase **GLOBAL_SEARCH** (Phase 2) via `ping360_nearest` pour calculer l'orientation initiale vers le filet.
 
-4. **Le Sonoptix** prend le relais en Phase 2 APPROACHING et assure tout le contrôle en Phase 3.
+4. **Le Sonoptix 2D** prend le relais dès la phase APPROACHING (Phase 2) et assure **tout le contrôle** en Phase 3.
 
 5. **Le spawn** est randomisé sur un cercle de rayon 3.5m autour du filet avec le nez pointé vers le filet.
 
 6. **La détection de fin de tour** en Phase 3 utilise le yaw accumulé (`≥ 2π rad`) pour savoir quand une orbite complète est effectuée. La profondeur descend ensuite d'un pas de 0.5m jusqu'à -6m.
+
+7. **Le mode `use_hardware:=True`** remplace la simulation Gazebo par MAVROS + `bluerov2_bridge`, permettant d'utiliser le même code de guidage sur le vrai robot BlueROV2.
