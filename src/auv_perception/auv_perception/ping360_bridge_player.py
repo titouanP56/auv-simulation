@@ -63,7 +63,7 @@ from rosbags.highlevel import AnyReader
 # ═════════════════════════════════════════════════════════════════════════════
 # ▼▼▼  MODIFY THIS PATH TO POINT TO YOUR ACTUAL BAG FILE  ▼▼▼
 # ═════════════════════════════════════════════════════════════════════════════
-BAG_FILE_PATH: str = "/home/titou/AUV_project/ros2_AUV/2026-02-05_11-03-27_data.bag"
+BAG_FILE_PATH: str = "/home/titou/AUV_project/ros2_AUV/2026-02-05_11-16-19_data.bag"
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -258,20 +258,20 @@ class Ping360BridgePlayer(Node):
                     )
                     continue
 
-                # ── Wrap-around detection ─────────────────────────────────────
-                # A new sweep begins when the angle jumps from a high value
-                # (> WRAP_HIGH) back to a low value (< WRAP_LOW).
-                if (
-                    self._prev_angle_deg is not None
-                    and self._prev_angle_deg > WRAP_HIGH
-                    and angle_deg < WRAP_LOW
-                ):
-                    self.get_logger().debug(
-                        f"[ping360_bridge_player] Wrap-around detected: "
-                        f"{self._prev_angle_deg}° → {angle_deg}° — "
-                        "publishing LaserScan."
-                    )
-                    self._publish_scan(bag_timestamp_ns)
+                # A new sweep begins when the angle crosses the 0/360 boundary
+                # either forward (>300 to <50) or backward (<50 to >300).
+                if self._prev_angle_deg is not None:
+                    forward_wrap = (self._prev_angle_deg > WRAP_HIGH and angle_deg < WRAP_LOW)
+                    reverse_wrap = (self._prev_angle_deg < WRAP_LOW and angle_deg > WRAP_HIGH)
+                    
+                    if forward_wrap or reverse_wrap:
+                        direction = "forward" if forward_wrap else "reverse"
+                        self.get_logger().debug(
+                            f"[ping360_bridge_player] Wrap-around detected ({direction}): "
+                            f"{self._prev_angle_deg}° → {angle_deg}° — "
+                            "publishing LaserScan."
+                        )
+                        self._publish_scan(bag_timestamp_ns)
 
                 self._prev_angle_deg = angle_deg
 

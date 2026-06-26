@@ -34,6 +34,10 @@ ROS 2 Topics
   Input : /sonoptix/points            (sensor_msgs/PointCloud2)
   Outputs: /sonoptix/perception       (geometry_msgs/PoseStamped)
            /sonoptix/perception_valid  (std_msgs/Bool)
+  Debug  : ~/debug/raw_cloud          (visualization_msgs/Marker POINTS)
+           ~/debug/inlier_cloud       (visualization_msgs/Marker POINTS)
+           ~/debug/ransac_plane       (visualization_msgs/Marker CUBE)
+           ~/debug/normal_arrow       (visualization_msgs/Marker ARROW)
 
 Configurable Parameters
 -----------------------
@@ -56,8 +60,9 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import PointCloud2
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
 from std_msgs.msg import Bool
+from visualization_msgs.msg import Marker
 
 
 # ── Backend detection ──────────────────────────────────────────────────────────
@@ -148,15 +153,15 @@ def _cull_points(pts: np.ndarray, min_range: float, max_range: float) -> np.ndar
     return pts[range_mask]
 
 
-def _orient_normal_toward_origin(normal: np.ndarray) -> np.ndarray:
+def _orient_plane_toward_origin(normal: np.ndarray, d: float) -> tuple[np.ndarray, float]:
     """
     Ensure the plane normal points toward the AUV (≈ toward the sensor frame
     origin). If the X component of the normal (robot forward axis) is negative,
-    flip the vector.
+    flip the vector and the d coefficient so that ax+by+cz+d=0 remains true.
     """
     if normal[0] < 0.0:
-        return -normal
-    return normal
+        return -normal, -d
+    return normal, d
 
 
 def _normal_to_quaternion(normal: np.ndarray) -> tuple[float, float, float, float]:
@@ -198,11 +203,11 @@ def _ransac_open3d(
     distance_threshold: float,
     ransac_n: int,
     num_iterations: int = 100,
-) -> tuple[np.ndarray, float, float] | None:
+) -> tuple[np.ndarray, float, float, np.ndarray, list] | None:
     """
     Plane fitting by RANSAC using Open3D (C++ backend).
 
-    Returns (normalised_normal, orthogonal_distance, inlier_ratio) or None.
+    Returns (normalised_normal, orthogonal_distance, inlier_ratio, plane_model, inlier_indices) or None.
     """
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pts.astype(np.float64))
@@ -222,29 +227,38 @@ def _ransac_open3d(
     if norm_mag < 1e-9:
         return None
 
-    # Open3D already normalises coefficients (a²+b²+c²=1), but re-normalise
-    # for safety.
     normal /= norm_mag
-    distance = abs(d / norm_mag)
+    d /= norm_mag
+    
+    distance = abs(d)
     inlier_ratio = len(inlier_indices) / len(pts)
 
-    return normal, distance, inlier_ratio
+    plane_model = np.array([normal[0], normal[1], normal[2], d], dtype=np.float64)
+
+    return normal, distance, inlier_ratio, plane_model, inlier_indices
 
 
 def _ransac_sklearn(
     pts: np.ndarray,
     distance_threshold: float,
-) -> tuple[np.ndarray, float, float] | None:
+) -> tuple[np.ndarray, float, float, np.ndarray, np.ndarray] | None:
     """
     Plane fitting by RANSAC using sklearn RANSACRegressor (fallback backend).
+    Automatically swaps axes based on variance to avoid vertical singularities.
 
-    Model: z = a*x + b*y + c  →  plane ax + by - z + c = 0
-    Normal = [a, b, -1] (normalised).
-
-    Returns (normalised_normal, orthogonal_distance, inlier_ratio) or None.
+    Returns (normalised_normal, orthogonal_distance, inlier_ratio, plane_model, inlier_mask) or None.
     """
-    X = pts[:, :2]   # (x, y)
-    y = pts[:, 2]    # z
+    x = pts[:, 0]
+    y = pts[:, 1]
+    z = pts[:, 2]
+
+    var_x = np.var(x)
+    var_y = np.var(y)
+    var_z = np.var(z)
+    
+    # The axis with the smallest variance is the normal direction to the plane.
+    # We use it as the dependent variable to avoid infinite slopes.
+    min_var_idx = np.argmin([var_x, var_y, var_z])
 
     try:
         ransac = RANSACRegressor(
@@ -254,24 +268,67 @@ def _ransac_sklearn(
             max_trials=200,
             random_state=42,
         )
-        ransac.fit(X, y)
+        
+        if min_var_idx == 0:
+            # X is dependent: X = aY + bZ + c
+            features = pts[:, 1:3]  # Y, Z
+            ransac.fit(features, x)
+            a, b = ransac.estimator_.coef_
+            c_intercept = ransac.estimator_.intercept_
+            # -X + aY + bZ + c_intercept = 0
+            normal = np.array([-1.0, a, b], dtype=np.float64)
+            d = c_intercept
+            
+        elif min_var_idx == 1:
+            # Y is dependent: Y = aX + bZ + c
+            features = pts[:, [0, 2]]  # X, Z
+            ransac.fit(features, y)
+            a, b = ransac.estimator_.coef_
+            c_intercept = ransac.estimator_.intercept_
+            # aX - Y + bZ + c_intercept = 0
+            normal = np.array([a, -1.0, b], dtype=np.float64)
+            d = c_intercept
+            
+        else:
+            # Z is dependent: Z = aX + bY + c
+            features = pts[:, :2]  # X, Y
+            ransac.fit(features, z)
+            a, b = ransac.estimator_.coef_
+            c_intercept = ransac.estimator_.intercept_
+            # aX + bY - Z + c_intercept = 0
+            normal = np.array([a, b, -1.0], dtype=np.float64)
+            d = c_intercept
+
     except Exception:
         return None
-
-    a, b = ransac.estimator_.coef_
-    c_intercept = ransac.estimator_.intercept_
-    # Plane: a*x + b*y - z + c_intercept = 0
-    normal = np.array([a, b, -1.0], dtype=np.float64)
+        
     norm_mag = np.linalg.norm(normal)
     if norm_mag < 1e-9:
         return None
     normal /= norm_mag
+    d /= norm_mag
 
-    # Distance from origin to the plane
-    distance = abs(c_intercept) / norm_mag
-
+    distance = abs(d)
     inlier_ratio = float(ransac.inlier_mask_.sum()) / len(pts)
-    return normal, distance, inlier_ratio
+    
+    plane_model = np.array([normal[0], normal[1], normal[2], d], dtype=np.float64)
+
+    return normal, distance, inlier_ratio, plane_model, ransac.inlier_mask_
+
+
+def _make_marker_base(frame_id: str, stamp, ns: str, marker_id: int,
+                      marker_type: int) -> Marker:
+    """Return a Marker with all mandatory fields pre-filled."""
+    m = Marker()
+    m.header.frame_id    = frame_id
+    if stamp is not None:
+        m.header.stamp   = stamp
+    m.ns                 = ns
+    m.id                 = marker_id
+    m.type               = marker_type
+    m.action             = Marker.ADD
+    m.pose.orientation.w = 1.0
+    return m
 
 
 # ── Main node ──────────────────────────────────────────────────────────────────
@@ -282,7 +339,7 @@ class SonoptixPerceptionNode(Node):
 
     Receives the raw point cloud, extracts the net plane via 3D RANSAC, and
     publishes the orthogonal distance and orientation (quaternion) of the plane
-    as a geometry_msgs/PoseStamped.
+    as a geometry_msgs/PoseStamped, along with debugging markers.
     """
 
     def __init__(self) -> None:
@@ -338,6 +395,12 @@ class SonoptixPerceptionNode(Node):
             Bool, '/sonoptix/perception_valid', 10
         )
 
+        # ── Debug / Foxglove markers (under node namespace ~/) ─────────────────
+        self._pub_raw_cloud    = self.create_publisher(Marker, '~/debug/raw_cloud',    10)
+        self._pub_inlier_cloud = self.create_publisher(Marker, '~/debug/inlier_cloud', 10)
+        self._pub_ransac_plane = self.create_publisher(Marker, '~/debug/ransac_plane', 10)
+        self._pub_normal_arrow = self.create_publisher(Marker, '~/debug/normal_arrow', 10)
+
         # ── Diagnostic counters ───────────────────────────────────────────────
         self._n_received  = 0
         self._n_published = 0
@@ -351,7 +414,11 @@ class SonoptixPerceptionNode(Node):
             f'  Min inlier ratio       : {self._min_inlier:.0%}\n'
             f'  Min points for RANSAC  : {self._min_points}\n'
             f'  Input topic            : /sonoptix/points\n'
-            f'  Output topics          : /sonoptix/perception  +  /sonoptix/perception_valid'
+            f'  Output topics          : /sonoptix/perception  +  /sonoptix/perception_valid\n'
+            f'  Foxglove viz topics    : ~/debug/raw_cloud    (grey  POINTS)\n'
+            f'                           ~/debug/inlier_cloud (green POINTS)\n'
+            f'                           ~/debug/ransac_plane (red   CUBE)\n'
+            f'                           ~/debug/normal_arrow (cyan  ARROW)'
         )
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -362,6 +429,9 @@ class SonoptixPerceptionNode(Node):
         """Process a Sonoptix point cloud and publish the perception result."""
         self._n_received += 1
 
+        frame_id = msg.header.frame_id if msg.header.frame_id else 'sonoptix_link'
+        stamp = msg.header.stamp
+
         # ── 1. Decode ──────────────────────────────────────────────────────────
         pts = _decode_pointcloud2(msg)
         if pts is None:
@@ -370,6 +440,10 @@ class SonoptixPerceptionNode(Node):
 
         # ── 2. Spatial culling ─────────────────────────────────────────────────
         pts = _cull_points(pts, self._min_range, self._max_range)
+        
+        # Publish raw culled points for debug
+        self._publish_raw_cloud(pts, frame_id, stamp)
+
         if len(pts) < self._min_points:
             if self._n_received % 20 == 1:
                 self.get_logger().debug(
@@ -391,7 +465,7 @@ class SonoptixPerceptionNode(Node):
             self._publish_invalid()
             return
 
-        normal, distance, inlier_ratio = result
+        normal, distance, inlier_ratio, plane_model, inlier_indices = result
 
         # ── 4. Inlier ratio validation ─────────────────────────────────────────
         if inlier_ratio < self._min_inlier:
@@ -404,15 +478,15 @@ class SonoptixPerceptionNode(Node):
             return
 
         # ── 5. Orient the normal toward the AUV ───────────────────────────────
-        normal = _orient_normal_toward_origin(normal)
+        normal, d = _orient_plane_toward_origin(normal, plane_model[3])
 
         # ── 6. Encode as quaternion ────────────────────────────────────────────
         qx, qy, qz, qw = _normal_to_quaternion(normal)
 
-        # ── 7. Publish ────────────────────────────────────────────────────────
+        # ── 7. Publish Functional Topics ──────────────────────────────────────
         pose_msg = PoseStamped()
-        pose_msg.header.stamp    = msg.header.stamp
-        pose_msg.header.frame_id = msg.header.frame_id if msg.header.frame_id else 'sonoptix_link'
+        pose_msg.header.stamp    = stamp
+        pose_msg.header.frame_id = frame_id
         pose_msg.pose.position.x = distance
         pose_msg.pose.position.y = 0.0
         pose_msg.pose.position.z = 0.0
@@ -426,6 +500,22 @@ class SonoptixPerceptionNode(Node):
         valid_msg = Bool()
         valid_msg.data = True
         self._valid_pub.publish(valid_msg)
+
+        # ── 8. Publish Debug Markers ──────────────────────────────────────────
+        if self._backend == 'open3d':
+            inlier_pts = pts[inlier_indices]
+        else:
+            inlier_pts = pts[inlier_indices] # boolean mask also works with numpy
+
+        self._publish_inlier_cloud(inlier_pts, frame_id, stamp)
+        
+        # Closest point on the plane is -d * normal (since normal is normalized)
+        pc_x = -d * normal[0]
+        pc_y = -d * normal[1]
+        pc_z = -d * normal[2]
+        
+        self._publish_ransac_plane(pc_x, pc_y, pc_z, qx, qy, qz, qw, frame_id, stamp)
+        self._publish_normal_arrow(pc_x, pc_y, pc_z, frame_id, stamp)
 
         self._n_published += 1
         self._n_failures = 0   # reset consecutive failure counter
@@ -446,7 +536,7 @@ class SonoptixPerceptionNode(Node):
 
     def _run_ransac(
         self, pts: np.ndarray
-    ) -> tuple[np.ndarray, float, float] | None:
+    ) -> tuple[np.ndarray, float, float, np.ndarray, list] | None:
         """Dispatch to the available RANSAC backend."""
         if self._backend == 'open3d':
             return _ransac_open3d(pts, self._ransac_dist, self._ransac_n)
@@ -464,6 +554,77 @@ class SonoptixPerceptionNode(Node):
         valid_msg = Bool()
         valid_msg.data = False
         self._valid_pub.publish(valid_msg)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Debug marker publishers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _publish_raw_cloud(self, pts: np.ndarray, frame_id: str, stamp) -> None:
+        """Grey POINTS — all points that passed the range filter."""
+        m = _make_marker_base(frame_id, stamp, 'raw_cloud', 0, Marker.POINTS)
+        m.scale.x = 0.04; m.scale.y = 0.04; m.scale.z = 0.04
+        m.color.r = 0.6;  m.color.g = 0.6;  m.color.b = 0.6; m.color.a = 0.7
+
+        for row in pts:
+            p = Point(); p.x = float(row[0]); p.y = float(row[1]); p.z = float(row[2])
+            m.points.append(p)
+
+        self._pub_raw_cloud.publish(m)
+
+    def _publish_inlier_cloud(self, inlier_pts: np.ndarray, frame_id: str, stamp) -> None:
+        """Green POINTS — RANSAC inlier points (= the detected net)."""
+        m = _make_marker_base(frame_id, stamp, 'inlier_cloud', 1, Marker.POINTS)
+        m.scale.x = 0.06; m.scale.y = 0.06; m.scale.z = 0.06
+        m.color.r = 0.0;  m.color.g = 1.0;  m.color.b = 0.2; m.color.a = 1.0
+
+        for row in inlier_pts:
+            p = Point(); p.x = float(row[0]); p.y = float(row[1]); p.z = float(row[2])
+            m.points.append(p)
+
+        self._pub_inlier_cloud.publish(m)
+
+    def _publish_ransac_plane(self, x: float, y: float, z: float,
+                               qx: float, qy: float, qz: float, qw: float,
+                               frame_id: str, stamp) -> None:
+        """Red CUBE — the fitted plane."""
+        m = _make_marker_base(frame_id, stamp, 'ransac_plane', 2, Marker.CUBE)
+        # Orientation aligns X axis with normal
+        m.pose.position.x = x
+        m.pose.position.y = y
+        m.pose.position.z = z
+        m.pose.orientation.x = qx
+        m.pose.orientation.y = qy
+        m.pose.orientation.z = qz
+        m.pose.orientation.w = qw
+        
+        # thin in X, wide in Y and Z
+        m.scale.x = 0.05
+        m.scale.y = 6.0
+        m.scale.z = 6.0
+        
+        m.color.r = 1.0; m.color.g = 0.15; m.color.b = 0.0; m.color.a = 0.4
+
+        self._pub_ransac_plane.publish(m)
+
+    def _publish_normal_arrow(self, x_close: float, y_close: float, z_close: float,
+                               frame_id: str, stamp) -> None:
+        """
+        Cyan ARROW — from the closest point on the plane to the AUV origin.
+
+        tail = (x_close, y_close, z_close) on the plane
+        tip  = (0, 0, 0) = sensor origin = AUV position in sensor frame
+        """
+        m = _make_marker_base(frame_id, stamp, 'normal_arrow', 3, Marker.ARROW)
+        m.scale.x = 0.05   # shaft diameter
+        m.scale.y = 0.10   # head diameter
+        m.scale.z = 0.12   # head length
+        m.color.r = 0.0; m.color.g = 0.85; m.color.b = 1.0; m.color.a = 1.0
+
+        tail = Point(); tail.x = float(x_close); tail.y = float(y_close); tail.z = float(z_close)
+        tip  = Point(); tip.x  = 0.0;            tip.y  = 0.0;            tip.z  = 0.0
+        m.points = [tail, tip]
+
+        self._pub_normal_arrow.publish(m)
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
